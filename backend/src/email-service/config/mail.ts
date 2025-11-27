@@ -9,3 +9,12 @@ export const mailTransporter = nodemailer.createTransport({
     pass: process.env.MAIL_PASS,
   },
 });
+
+export const testConnection = async () => {
+    try {
+        await mailTransporter.verify();
+        console.log("Mail server is ready!");
+    } catch (err) {
+        console.error("Mail Server connection failed", err);
+    }
+}
