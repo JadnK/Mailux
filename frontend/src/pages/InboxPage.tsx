@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import Inbox from "../components/Inbox";
 import { fetchInbox } from "../api/mail";
-import type { Mail } from "../api/mail";
+import type { Mail } from "../types/mail";
 
 interface Props {
   username: string;
