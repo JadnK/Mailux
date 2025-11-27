@@ -15,7 +15,7 @@ const Layout: React.FC<Props> = ({ children, username }) => {
           <nav className="space-x-4">
             <Link to="/" className="hover:underline text-gray-100">Inbox</Link>
             <Link to="/compose" className="hover:underline text-gray-100">Compose</Link>
-            {username && <span className="ml-4 text-gray-400">Hi, {username}</span>}
+            <span className="ml-4 text-gray-400">Hi, {username}</span>
           </nav>
         </div>
       </header>
