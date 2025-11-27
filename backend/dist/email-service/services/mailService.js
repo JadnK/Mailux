@@ -1,5 +1,6 @@
 import { mailTransporter } from "../config/mail.js";
 import imaps from "imap-simple";
+import { simpleParser } from "mailparser";
 import { imapConfig } from "../config/imap.js";
 export const sendMail = async (mailData) => {
     try {
@@ -16,46 +17,41 @@ export const getInbox = async (username) => {
     const connection = await imaps.connect(imapConfig);
     await connection.openBox("INBOX");
     const searchCriteria = ["ALL"];
-    const fetchOptions = {
-        bodies: ["HEADER.FIELDS (FROM TO SUBJECT DATE)", "TEXT"],
-        struct: true,
-    };
-    const mails = await connection.search(searchCriteria, fetchOptions);
-    const formatted = mails.map((mail) => {
-        const header = mail.parts.find((p) => p.which.includes("HEADER"));
-        const body = mail.parts.find((p) => p.which === "TEXT");
+    const fetchOptions = { bodies: [""], struct: true }; // leer = kompletter Raw-Body
+    const messages = await connection.search(searchCriteria, fetchOptions);
+    const mails = await Promise.all(messages.map(async (msg) => {
+        const allParts = msg.parts.find((p) => p.which === "");
+        const parsed = await simpleParser(allParts.body);
         return {
-            from: header.body.from?.[0],
-            to: header.body.to?.[0],
-            subject: header.body.subject?.[0],
-            date: header.body.date?.[0],
-            text: body?.body || "",
+            from: parsed.from?.text || "",
+            to: parsed.to?.text || "",
+            subject: parsed.subject || "",
+            date: parsed.date?.toString() || "",
+            text: parsed.text || "",
+            html: parsed.html || "",
         };
-    });
+    }));
     await connection.end();
-    return formatted;
+    return mails;
 };
 export const getSent = async (username) => {
     const connection = await imaps.connect(imapConfig);
-    // Je nach Dovecot-Config evtl. "Sent Messages", "Gesendet"
-    await connection.openBox("Sent");
-    const mails = await connection.search(["ALL"], {
-        bodies: ["HEADER.FIELDS (FROM TO SUBJECT DATE)", "TEXT"],
-        struct: true,
-    });
-    const formatted = mails.map((mail) => {
-        const header = mail.parts.find((p) => p.which.includes("HEADER"));
-        const body = mail.parts.find((p) => p.which === "TEXT");
+    await connection.openBox("Sent"); // ggf. "Sent Messages"
+    const messages = await connection.search(["ALL"], { bodies: [""], struct: true });
+    const mails = await Promise.all(messages.map(async (msg) => {
+        const allParts = msg.parts.find((p) => p.which === "");
+        const parsed = await simpleParser(allParts.body);
         return {
-            from: header.body.from?.[0],
-            to: header.body.to?.[0],
-            subject: header.body.subject?.[0],
-            date: header.body.date?.[0],
-            text: body?.body || "",
+            from: parsed.from?.text || "",
+            to: parsed.to?.text || "",
+            subject: parsed.subject || "",
+            date: parsed.date?.toString() || "",
+            text: parsed.text || "",
+            html: parsed.html || "",
         };
-    });
+    }));
     await connection.end();
-    return formatted;
+    return mails;
 };
 export const replyMail = async (mailData) => {
     return await sendMail(mailData);
