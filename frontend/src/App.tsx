@@ -1,44 +1,36 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from "react";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import Inbox from "./components/Inbox";
+import SendMailForm from "./components/SendMailForm";
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const username = (import.meta.env.VITE_USERNAME as string) || "jaden";
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <BrowserRouter>
+      <div className="min-h-screen bg-gray-50 text-gray-900">
+        <header className="bg-white shadow">
+          <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+            <h1 className="text-xl font-bold">Mailux</h1>
+            <nav className="space-x-4">
+              <Link to="/" className="text-sm hover:underline">Inbox</Link>
+              <Link to="/compose" className="text-sm hover:underline">Compose</Link>
+            </nav>
+          </div>
+        </header>
+
+        <main className="max-w-5xl mx-auto px-4 py-6">
+          <Routes>
+            <Route path="/" element={<Inbox username={username} />} />
+            <Route path="/compose" element={<SendMailForm />} />
+            <Route path="*" element={<div>Page not found</div>} />
+          </Routes>
+        </main>
+
+        <footer className="mt-12 py-4 text-center text-xs text-gray-500">
+          © {new Date().getFullYear()} Mailux
+        </footer>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </BrowserRouter>
+  );
 }
-
-export default App
-
-
-// NOTE: Example of fetching from backend API
-
-// useEffect(() => {
-//   fetch("http://localhost:5000/api/hello")
-//     .then(res => res.json())
-//     .then(data => console.log(data));
-// }, []);
