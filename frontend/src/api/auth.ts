@@ -1,14 +1,21 @@
 export const login = async (username: string, password: string) => {
   try {
-    const res = await fetch("http://localhost:5000/api/users/login", {
+    const res = await fetch("http://jadenk.de:5000/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
-    if (!res.ok) throw new Error("Invalid credentials");
-    return await res.json(); // z.B. { token, username }
+
+    const data = await res.json();
+
+    // nur auf username prüfen, kein token nötig
+    if (!data.username) {
+      throw new Error("Invalid credentials");
+    }
+
+    return data;
   } catch (err) {
-    console.error(err);
+    console.error("Login failed:", err);
     throw err;
   }
 };
