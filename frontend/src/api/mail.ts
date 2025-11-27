@@ -1,7 +1,7 @@
 import type { Mail } from "../types/mail";
 
 export const fetchInbox = async (username: string): Promise<Mail[]> => {
-  const res = await fetch(`http://localhost:5000/api/mail/inbox?username=${username}`);
+  const res = await fetch(`http://localhost:5000/api/mail/inbox/${username}`);
   if (!res.ok) return [];
   return res.json();
 };
