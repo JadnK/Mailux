@@ -1,13 +1,8 @@
-export type Mail = {
-  from: string;
-  to: string;
-  subject: string;
-  date: string;
-  text: string;
-};
+import type { Mail } from "../types/mail";
 
 export const fetchInbox = async (username: string): Promise<Mail[]> => {
-  const res = await fetch(`http://localhost:5000/api/mail/inbox/${username}`);
+  const res = await fetch(`http://localhost:5000/api/mail/inbox?username=${username}`);
+  if (!res.ok) return [];
   return res.json();
 };
 
