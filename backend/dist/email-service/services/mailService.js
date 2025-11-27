@@ -37,7 +37,7 @@ export const getInbox = async (username) => {
 };
 export const getSent = async (username) => {
     const connection = await imaps.connect(imapConfig);
-    // Je nach Dovecot-Config evtl. ändere zu: "Sent Messages", "Gesendet"
+    // Je nach Dovecot-Config evtl. "Sent Messages", "Gesendet"
     await connection.openBox("Sent");
     const mails = await connection.search(["ALL"], {
         bodies: ["HEADER.FIELDS (FROM TO SUBJECT DATE)", "TEXT"],
