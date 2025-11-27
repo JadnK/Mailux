@@ -1,5 +1,7 @@
 import { mailTransporter } from "../config/mail.js";
 import nodemailer from "nodemailer";
+import imaps from "imap-simple";
+import { imapConfig } from "../config/imap.js";
 
 type MailData = Parameters<typeof mailTransporter.sendMail>[0];
 
@@ -13,14 +15,65 @@ export const sendMail = async (mailData: MailData) => {
     throw err;
   }
 };
-// Dummy-Funktionen für getInbox/getSent
-// In einer echten Implementation würdest du IMAP/Postfix Logs nutzen oder eine DB
+
 export const getInbox = async (username: string) => {
-  return []; // return emails
+  const connection = await imaps.connect(imapConfig);
+
+  await connection.openBox("INBOX");
+
+  const searchCriteria = ["ALL"];
+  const fetchOptions = {
+    bodies: ["HEADER.FIELDS (FROM TO SUBJECT DATE)", "TEXT"],
+    struct: true,
+  };
+
+  const mails = await connection.search(searchCriteria, fetchOptions);
+
+  const formatted = mails.map((mail: any) => {
+    const header = mail.parts.find((p: any) => p.which.includes("HEADER"));
+    const body = mail.parts.find((p: any) => p.which === "TEXT");
+
+    return {
+      from: header.body.from?.[0],
+      to: header.body.to?.[0],
+      subject: header.body.subject?.[0],
+      date: header.body.date?.[0],
+      text: body?.body || "",
+    };
+  });
+
+  await connection.end();
+
+  return formatted;
 };
 
 export const getSent = async (username: string) => {
-  return []; // return emails
+  const connection = await imaps.connect(imapConfig);
+
+  // Je nach Dovecot-Config evtl. "Sent Messages", "Gesendet"
+  await connection.openBox("Sent");
+
+  const mails = await connection.search(["ALL"], {
+    bodies: ["HEADER.FIELDS (FROM TO SUBJECT DATE)", "TEXT"],
+    struct: true,
+  });
+
+  const formatted = mails.map((mail: any) => {
+    const header = mail.parts.find((p: any) => p.which.includes("HEADER"));
+    const body = mail.parts.find((p: any) => p.which === "TEXT");
+
+    return {
+      from: header.body.from?.[0],
+      to: header.body.to?.[0],
+      subject: header.body.subject?.[0],
+      date: header.body.date?.[0],
+      text: body?.body || "",
+    };
+  });
+
+  await connection.end();
+
+  return formatted;
 };
 
 export const replyMail = async (mailData: MailData) => {
