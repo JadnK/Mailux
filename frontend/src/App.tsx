@@ -7,11 +7,26 @@ import LoginPage from "./pages/LoginPage";
 export default function App() {
   const [user, setUser] = useState<{ username: string } | null>(null);
 
+  // Check localStorage token on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) setUser(JSON.parse(storedUser));
+    const token = localStorage.getItem("token");
+    const username = localStorage.getItem("username");
+    if (token && username) {
+      setUser({ username });
+    }
   }, []);
 
+  const handleLogin = (loggedInUser: { username: string }) => {
+    setUser(loggedInUser);
+    localStorage.setItem("username", loggedInUser.username);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+  };
+  
   if (!user) {
     return <LoginPage onLogin={(u: { username: string }) => setUser(u)} />;
   }
