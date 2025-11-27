@@ -1,45 +1,36 @@
 import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import InboxPage from "./pages/InboxPage";
-import SendMailForm from "./components/SendMailForm";
+import ComposePage from "./pages/ComposePage";
 import LoginPage from "./pages/LoginPage";
+import SentPage from "./pages/SentPage";
 
 export default function App() {
   const [user, setUser] = useState<{ username: string } | null>(null);
 
-  // Check localStorage token on mount
   useEffect(() => {
     const token = localStorage.getItem("token");
     const username = localStorage.getItem("username");
-    if (token && username) {
-      setUser({ username });
-    }
+    if (token && username) setUser({ username });
   }, []);
 
-  const handleLogin = (loggedInUser: { username: string }) => {
-    setUser(loggedInUser);
-    localStorage.setItem("username", loggedInUser.username);
-  };
-
+  const handleLogin = (loggedInUser: { username: string }) => setUser(loggedInUser);
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem("token");
     localStorage.removeItem("username");
   };
-  
-  if (!user) {
-    return <LoginPage onLogin={(u: { username: string }) => setUser(u)} />;
-  }
+
+  if (!user) return <LoginPage onLogin={handleLogin} />;
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-900 text-gray-100">
-        <Routes>
-          <Route path="/" element={<InboxPage username={user.username} />} />
-          <Route path="/compose" element={<SendMailForm />} />
-          <Route path="*" element={<div className="p-6 text-center">Page not found</div>} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route path="/" element={<InboxPage username={user.username} />} />
+        <Route path="/compose" element={<ComposePage />} />
+        <Route path="/sent" element={<SentPage username={user.username} />} />
+        <Route path="*" element={<div className="p-6 text-center text-gray-300">Page not found</div>} />
+      </Routes>
     </BrowserRouter>
   );
 }

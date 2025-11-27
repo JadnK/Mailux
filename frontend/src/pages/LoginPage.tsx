@@ -16,7 +16,7 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
       const data = await login(username, password);
       localStorage.setItem("token", data.token);
       localStorage.setItem("username", data.username);
-      onLogin(data.username);
+      onLogin({ username: data.username });
     } catch {
       setError("Invalid username or password");
     }

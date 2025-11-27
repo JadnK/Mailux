@@ -12,7 +12,8 @@ const SendMailForm: React.FC = () => {
     try {
       await sendMail({ from: "info@jadenk.de", to, subject, text });
       setStatus("Mail sent!");
-    } catch (err) {
+      setTo(""); setSubject(""); setText("");
+    } catch {
       setStatus("Failed to send mail.");
     }
   };

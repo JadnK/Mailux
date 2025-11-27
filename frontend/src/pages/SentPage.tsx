@@ -1,36 +1,37 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
-import Inbox from "../components/Inbox";
-import { fetchInbox } from "../api/mail";
 import type { Mail } from "../types/mail";
+import { fetchSent } from "../api/mail"; 
+import Inbox from "../components/Inbox";
 
 interface Props {
   username: string;
 }
 
-const InboxPage: React.FC<Props> = ({ username }) => {
+const SentPage: React.FC<Props> = ({ username }) => {
   const [mails, setMails] = useState<Mail[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadMails = async () => {
+    const loadSent = async () => {
       try {
-        const data = await fetchInbox(username);
+        const data = await fetchSent(username);
         setMails(data);
       } catch {
-        console.error("Failed to fetch inbox");
+        console.error("Failed to fetch sent mails");
       } finally {
         setLoading(false);
       }
     };
-    loadMails();
+    loadSent();
   }, [username]);
 
   return (
     <Layout username={username}>
-      {loading ? <p>Loading...</p> : <Inbox username={username} mails={mails} />}
+      <h2 className="text-lg font-semibold mb-4 text-purple-400">Sent Mails</h2>
+      {loading ? <p>Loading...</p> : <Inbox mails={mails} />}
     </Layout>
   );
 };
 
-export default InboxPage;
+export default SentPage;

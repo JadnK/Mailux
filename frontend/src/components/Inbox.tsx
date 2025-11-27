@@ -13,7 +13,7 @@ const Inbox: React.FC<Props> = ({ username, mails = [] }) => {
         <p className="text-gray-400">No mails found.</p>
       ) : (
         mails.map((mail, i) => (
-          <div key={i} className="border p-3 mb-3 rounded bg-gray-800 text-gray-100 shadow-lg">
+          <div key={i} className="border p-3 mb-3 rounded bg-gray-800 text-gray-100 shadow-lg hover:bg-gray-700 transition">
             <p><strong>From:</strong> {mail.from}</p>
             <p><strong>Subject:</strong> {mail.subject}</p>
             <p className="mt-1">{mail.text}</p>
