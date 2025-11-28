@@ -1,0 +1,199 @@
+[33mcommit 669475f5833076ca829a49781e2bd5ca516eeb75[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/develop[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mdevelop[m[33m)[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Fri Nov 28 14:41:35 2025 +0100
+
+    fix: made only one user in .env
+
+[33mcommit fe00da369a9bd81947719076f86494a9b7aad288[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Fri Nov 28 14:02:56 2025 +0100
+
+    fix: mails will now be in sent to
+
+[33mcommit eada18653b201254fa0dd6172c7dd4f9478c0825[m[33m ([m[1;31morigin/feature/user-management[m[33m, [m[1;32mfeature/user-management[m[33m)[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Fri Nov 28 13:28:50 2025 +0100
+
+    fix: User Authentication
+
+[33mcommit 272ad7641206db15558f56bfe248cab6ca6997d9[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Fri Nov 28 08:45:52 2025 +0100
+
+    bug: pam doesnt get linuxuser+pw right
+
+[33mcommit 7e9ca0f6cda52c76e7158eba897cb3326c4b436e[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Fri Nov 28 08:36:07 2025 +0100
+
+    fix: users are now right
+
+[33mcommit bfde526f7ba863890759a8dfd026899a661684c2[m
+Author: Jaden K. <96341029+Verpxnter@users.noreply.github.com>
+Date:   Thu Nov 27 22:37:11 2025 +0100
+
+    fix: emails are now shown right
+
+[33mcommit 0941b7ff2c00e5e425b1bc22ebbf95a2cfbb6f51[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 22:01:39 2025 +0100
+
+    feat: made send page
+
+[33mcommit dfd51eee9e8827a21a45b8cd149798fd457ffa05[m[33m ([m[1;32mfeature/frontend-pages[m[33m)[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 21:43:29 2025 +0100
+
+    feat: added sent page, redesigned
+
+[33mcommit 576f5ce7348b587cb6733a02f1533e8d61f7b906[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 21:35:46 2025 +0100
+
+    f
+
+[33mcommit 8628a88305ac08794c7330a2e8dc0fb330b8831f[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 21:29:45 2025 +0100
+
+    Fixed everything
+
+[33mcommit 02b6ad2ea7a3558335069428313dc402a8056dbf[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 21:15:45 2025 +0100
+
+    fix: auth.ts
+
+[33mcommit ff00cd2c62788e3d2f570475c5f6265264c7322f[m
+Merge: b0bc3e1 7e2520a
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 20:55:29 2025 +0100
+
+    Merge branch 'feature/user-management' into develop
+
+[33mcommit 7e2520ab209f0290479c17f6c831974bd7c3d832[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 20:53:18 2025 +0100
+
+    feat: added user-login in backend
+
+[33mcommit b0bc3e18cfe43ce6d091d9a3c7908ba14a5bcba1[m[33m ([m[1;32mfeature/frontend-api[m[33m)[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 20:46:59 2025 +0100
+
+    feat: add login
+
+[33mcommit 016067ee004a548ecf5e5e7102c445fc1866510e[m
+Merge: e72e3c0 4211326
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 20:45:26 2025 +0100
+
+    Fix
+
+[33mcommit e72e3c03a6d96ee2a059892e20e3648273e7d094[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 20:38:33 2025 +0100
+
+    feat: create auth for login
+
+[33mcommit 4211326ef2d2e80c626ce9576adefd59dc781203[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 20:32:36 2025 +0100
+
+    fix: tailwind didnt load
+
+[33mcommit e6c1300ce25efa87b6fbf8ec188bb5cf8f627398[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 20:18:34 2025 +0100
+
+    feat: added pages
+
+[33mcommit f144ee47042cc299cbaba09e6b33bcfb1015a354[m[33m ([m[1;32mfeature/frontend-components[m[33m)[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 20:10:02 2025 +0100
+
+    feat: added components for frontend
+
+[33mcommit 4aeaedaf7c60096471a857caff2a3598f3fa8987[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 20:05:44 2025 +0100
+
+    feat: added mail.ts
+
+[33mcommit de6a0945bcb3862375adf5e97ca2384403ed1ef6[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 20:02:20 2025 +0100
+
+    feat: Added Folder Structure of frontend
+
+[33mcommit a504ecf732ad06a7a36ec4ab419c225a75fda0fc[m[33m ([m[1;32mfeature/email-service[m[33m)[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 19:16:49 2025 +0100
+
+    Fix: comment fixxed
+
+[33mcommit fd7bc0e71fe1bb2517033d624b96b20275b55d8e[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 19:11:40 2025 +0100
+
+    Fix: Function getSent/getInbox should work now
+
+[33mcommit d6d127b28de3c53f9056766ae3aa6fb602a9e721[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 18:59:40 2025 +0100
+
+    fix: connection fix to read .env
+
+[33mcommit 1393b6dd4751dc52548f8977af5e0adcc7c687df[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 18:46:35 2025 +0100
+
+    Made Mail sending work
+
+[33mcommit 4c37a292af090fe0d6fdf3902362ffdbe82ac9f8[m[33m ([m[1;32mfeature/settings[m[33m)[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 16:52:58 2025 +0100
+
+    feat: Added setting-service/
+
+[33mcommit 683231eed09fb2528ff234c811c63f051724e6c9[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 16:48:20 2025 +0100
+
+    fix: app.ts route to main router was wrong
+
+[33mcommit b43fce0442ba9c575e39df782173814561128184[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 16:46:36 2025 +0100
+
+    feat: added user-service/
+
+[33mcommit 4a7372bdbb49dec3ef4815732dfd008983d2d170[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 16:41:03 2025 +0100
+
+    feat: added mailController, changed structure of email-service/
+
+[33mcommit 09887660ee0cce1db8a5988592157fde77559de0[m[33m ([m[1;32mfeature/backend[m[33m)[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 16:16:21 2025 +0100
+
+    fix: forgot dotenv file
+
+[33mcommit 695f2c6b7ea52ca5e2ea01448621328c07621495[m
+Author: Jaden <jaden.kasche@gmail.com>
+Date:   Thu Nov 27 16:06:56 2025 +0100
+
+    feat: Email-Service basics added
+
+[33mcommit d97bb900c1835b5cccfa9e46eb93e7b1fc66b143[m
+Author: Jaden K. <96341029+Verpxnter@users.noreply.github.com>
+Date:   Thu Nov 27 14:46:34 2025 +0100
+
+    feat: Initial Commit of Backend / Frontend
+
+[33mcommit 1951fd053d183797e5747988bb37f813e12d40fb[m
+Author: Jaden K. <96341029+JadnK@users.noreply.github.com>
+Date:   Thu Nov 27 14:30:34 2025 +0100
+
+    Initial commit
