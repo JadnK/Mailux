@@ -3,8 +3,8 @@ dotenv.config();
 
 export const imapConfig = {
   imap: {
-    user: process.env.MAIL_USER_IMAP,
-    password: process.env.MAIL_PASS_IMAP,
+    user: process.env.MAIL_USER,
+    password: process.env.MAIL_PASS,
     host: process.env.MAIL_HOST_IMAP,
     port: Number(process.env.MAIL_IMAP_PORT) || 993,
     tls: true,
