@@ -1,23 +1,58 @@
-import { getAllUsers, getUser, updateUser, deactivateUser } from "../services/userService.js";
-export const listUsers = (req, res) => {
-    const users = getAllUsers();
-    res.json(users);
+import UserService from "../services/userService.js";
+const userService = new UserService();
+export const listUsers = async (req, res) => {
+    try {
+        const users = await userService.getAllUsersWithMaildir();
+        return res.json(users);
+    }
+    catch (err) {
+        console.error("listUsers error:", err);
+        return res.status(500).json({ message: "Failed to list users" });
+    }
 };
-export const getSingleUser = (req, res) => {
-    const user = getUser(req.params.username);
-    if (!user)
-        return res.status(404).json({ message: "User not found" });
-    res.json(user);
+export const getSingleUser = async (req, res) => {
+    try {
+        const username = req.params.username;
+        if (!username)
+            return res.status(400).json({ message: "username required" });
+        const user = await userService.getUser(username);
+        if (!user)
+            return res.status(404).json({ message: "User not found" });
+        return res.json(user);
+    }
+    catch (err) {
+        console.error("getSingleUser error:", err);
+        return res.status(500).json({ message: "Failed to get user" });
+    }
 };
-export const updateUserSettings = (req, res) => {
-    const updated = updateUser(req.params.username, req.body);
-    if (!updated)
-        return res.status(404).json({ message: "User not found" });
-    res.json(updated);
+export const updateUser = async (req, res) => {
+    try {
+        const username = req.params.username;
+        const updates = req.body;
+        if (!username)
+            return res.status(400).json({ message: "username required" });
+        const updated = await userService.updateUser(username, updates);
+        if (!updated)
+            return res.status(404).json({ message: "User not found" });
+        return res.json(updated);
+    }
+    catch (err) {
+        console.error("updateUser error:", err);
+        return res.status(500).json({ message: "Failed to update user" });
+    }
 };
-export const deactivateUserAccount = (req, res) => {
-    const success = deactivateUser(req.params.username);
-    if (!success)
-        return res.status(404).json({ message: "User not found" });
-    res.json({ message: "User deactivated" });
+export const deactivateUser = async (req, res) => {
+    try {
+        const username = req.params.username;
+        if (!username)
+            return res.status(400).json({ message: "username required" });
+        const ok = await userService.deactivateUser(username);
+        if (!ok)
+            return res.status(404).json({ message: "User not found or already inactive" });
+        return res.json({ message: "User deactivated" });
+    }
+    catch (err) {
+        console.error("deactivateUser error:", err);
+        return res.status(500).json({ message: "Failed to deactivate user" });
+    }
 };
