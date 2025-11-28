@@ -1,6 +1,3 @@
-// userService.ts (ESM-friendly)
-// - erwartet "type": "module" in package.json
-// - nutzt createRequire, lädt authenticate-pam lazily und robust
 import { promises as fs } from "fs";
 import path from "path";
 import { createRequire } from "module";
