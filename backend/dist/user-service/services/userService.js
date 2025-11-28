@@ -1,8 +1,10 @@
+// userService.ts (ESM-friendly)
+// - erwartet "type": "module" in package.json
+// - nutzt createRequire, lädt authenticate-pam lazily und robust
 import { promises as fs } from "fs";
 import path from "path";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const authenticate = require("authenticate-pam");
 export default class UserService {
     constructor(options) {
         this.options = options;
@@ -126,12 +128,67 @@ export default class UserService {
 }
 export const authenticateUser = (username, password, service = "login") => {
     return new Promise((resolve, reject) => {
-        authenticate(service, username, password, (err) => {
+        let pam = null;
+        try {
+            // Lazy load - falls das Paket fehlt, bekommen wir hier eine klare Fehlermeldung
+            pam = require("authenticate-pam");
+        }
+        catch (e) {
+            console.error("authenticate-pam could not be required:", e && e.message);
+            return reject(new Error("authenticate-pam not available"));
+        }
+        const cb = (err) => {
             if (err) {
-                console.error("PAM authentication failed:", err.message);
+                // Logge den PAM-Fehler, nicht das Passwort
+                console.error(`PAM auth failed (user=${username}, service=${service}):`, err.message || err);
                 return reject(err);
             }
             resolve(true);
-        });
+        };
+        try {
+            // Variante 1: modul hat eine `authenticate`-Funktion (häufig)
+            if (pam && typeof pam.authenticate === "function") {
+                try {
+                    pam.authenticate(username, password, cb);
+                    return;
+                }
+                catch (e) {
+                    // Einige Implementationen erwarten (service, username, password, cb)
+                    try {
+                        pam.authenticate(service, username, password, cb);
+                        return;
+                    }
+                    catch (e2) {
+                        console.error("authenticate-pam.authenticate calls failed:", e2 && e2.message);
+                        return reject(e2);
+                    }
+                }
+            }
+            // Variante 2: paket exportiert direkt eine function: pam(...)
+            if (typeof pam === "function") {
+                try {
+                    // try (username, password, cb)
+                    pam(username, password, cb);
+                    return;
+                }
+                catch (e) {
+                    // try (service, username, password, cb)
+                    try {
+                        pam(service, username, password, cb);
+                        return;
+                    }
+                    catch (e2) {
+                        console.error("authenticate-pam direct-call attempts failed:", e2 && e2.message);
+                        return reject(e2);
+                    }
+                }
+            }
+            // Unerwartete Export-Form
+            return reject(new Error("authenticate-pam: unexpected export shape"));
+        }
+        catch (outerErr) {
+            console.error("authenticate-pam invocation threw:", outerErr && outerErr.message);
+            return reject(outerErr);
+        }
     });
 };
