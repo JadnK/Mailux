@@ -1,7 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { createRequire } from "module";
-// Lade das native PAM-Modul über CommonJS, funktioniert in ESM
 const require = createRequire(import.meta.url);
 const authenticate = require("authenticate-pam");
 export default class UserService {
@@ -128,8 +127,10 @@ export default class UserService {
 export const authenticateUser = (username, password, service = "login") => {
     return new Promise((resolve, reject) => {
         authenticate(service, username, password, (err) => {
-            if (err)
+            if (err) {
+                console.error("PAM authentication failed:", err.message);
                 return reject(err);
+            }
             resolve(true);
         });
     });
