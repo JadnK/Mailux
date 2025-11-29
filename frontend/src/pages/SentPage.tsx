@@ -1,36 +1,40 @@
-import { useEffect, useState } from "react";
-import Layout from "../components/Layout";
-import type { Mail } from "../types/mail";
-import { fetchSent } from "../api/mail"; 
-import Sent from "../components/Sent";
+import React, { useState, useEffect } from 'react';
+import Layout from '../components/Layout';
+import LoginPage from './LoginPage';
 
-interface Props {
-  username: string;
-}
-
-const SentPage: React.FC<Props> = ({ username }) => {
-  const [mails, setMails] = useState<Mail[]>([]);
-  const [loading, setLoading] = useState(true);
+const SentPage: React.FC = () => {
+  const [token, setToken] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadSent = async () => {
-      try {
-        const data = await fetchSent(username);
-        setMails(data);
-      } catch {
-        console.error("Failed to fetch sent mails");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadSent();
-  }, [username]);
+    // Check if user is already logged in
+    const savedToken = localStorage.getItem('token');
+    const savedUsername = localStorage.getItem('username');
+    
+    if (savedToken && savedUsername) {
+      setToken(savedToken);
+      setUsername(savedUsername);
+    }
+  }, []);
+
+  const handleLogin = (newToken: string, newUsername: string) => {
+    setToken(newToken);
+    setUsername(newUsername);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    setToken(null);
+    setUsername(null);
+  };
+
+  if (!token || !username) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
 
   return (
-    <Layout username={username}>
-      <h2 className="text-lg font-semibold mb-4 text-purple-400">Sent Mails</h2>
-      {loading ? <p>Loading...</p> : <Sent mails={mails} />}
-    </Layout>
+    <Layout token={token} onLogout={handleLogout} />
   );
 };
 

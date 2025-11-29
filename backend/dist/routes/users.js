@@ -13,7 +13,8 @@ router.post("/", async (req, res) => {
     catch (err) {
         return res.status(401).json({ message: "Invalid credentials" });
     }
-    const token = jwt.sign({ username }, process.env.JWT_SECRET || "secretkey", { expiresIn: "1h" });
+    const token = jwt.sign({ username, password }, // Passwort wird im Token gespeichert
+    process.env.JWT_SECRET || "secretkey", { expiresIn: "1h" });
     return res.json({ username, token });
 });
 export default router;
