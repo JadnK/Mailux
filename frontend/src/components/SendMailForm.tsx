@@ -7,21 +7,13 @@ interface SendMailFormProps {
 }
 
 const SendMailForm: React.FC<SendMailFormProps> = ({ token, onMailSent }) => {
-  const [formData, setFormData] = useState({
-    to: '',
-    subject: '',
-    text: '',
-    html: ''
-  });
+  const [formData, setFormData] = useState({ to: '', subject: '', text: '', html: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,9 +26,7 @@ const SendMailForm: React.FC<SendMailFormProps> = ({ token, onMailSent }) => {
       await mailAPI.sendMail(formData);
       setSuccess(true);
       setFormData({ to: '', subject: '', text: '', html: '' });
-      if (onMailSent) {
-        onMailSent();
-      }
+      if (onMailSent) onMailSent();
     } catch (err) {
       console.error('Error sending mail:', err);
       setError('Failed to send email. Please check your connection and try again.');
@@ -46,67 +36,58 @@ const SendMailForm: React.FC<SendMailFormProps> = ({ token, onMailSent }) => {
   };
 
   return (
-    <div className="bg-white shadow rounded-lg p-6">
-      <h2 className="text-xl font-bold text-gray-900 mb-4">Compose Email</h2>
-      
+    <div className="bg-gray-850 shadow rounded-lg p-6">
+      <h2 className="text-xl font-bold text-purple-400 mb-4">Compose Email</h2>
+
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-          <p className="text-green-800">Email sent successfully!</p>
+        <div className="bg-purple-900 border border-purple-700 rounded-lg p-4 mb-4">
+          <p className="text-purple-300">Email sent successfully!</p>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-          <p className="text-red-800">{error}</p>
+        <div className="bg-red-900 border border-red-700 rounded-lg p-4 mb-4">
+          <p className="text-red-300">{error}</p>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="to" className="block text-sm font-medium text-gray-700">
-            To
-          </label>
+          <label className="block text-sm font-medium text-gray-400">To</label>
           <input
             type="email"
-            id="to"
             name="to"
             value={formData.to}
             onChange={handleChange}
             required
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             placeholder="recipient@example.com"
+            className="mt-1 block w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
           />
         </div>
 
         <div>
-          <label htmlFor="subject" className="block text-sm font-medium text-gray-700">
-            Subject
-          </label>
+          <label className="block text-sm font-medium text-gray-400">Subject</label>
           <input
             type="text"
-            id="subject"
             name="subject"
             value={formData.subject}
             onChange={handleChange}
             required
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             placeholder="Email subject"
+            className="mt-1 block w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
           />
         </div>
 
         <div>
-          <label htmlFor="text" className="block text-sm font-medium text-gray-700">
-            Message
-          </label>
+          <label className="block text-sm font-medium text-gray-400">Message</label>
           <textarea
-            id="text"
             name="text"
             value={formData.text}
             onChange={handleChange}
             required
             rows={6}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             placeholder="Write your message here..."
+            className="mt-1 block w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
           />
         </div>
 
@@ -114,7 +95,7 @@ const SendMailForm: React.FC<SendMailFormProps> = ({ token, onMailSent }) => {
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            className="px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-700 text-white font-medium focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
           >
             {loading ? 'Sending...' : 'Send Email'}
           </button>
