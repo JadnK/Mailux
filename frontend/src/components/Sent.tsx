@@ -26,26 +26,24 @@ const Sent: React.FC<SentProps> = ({ token }) => {
       }
     };
 
-    if (token) {
-      fetchMails();
-    }
+    if (token) fetchMails();
   }, [token]);
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-red-800">{error}</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+      <div className="bg-gray-850 border border-red-700 rounded-lg p-4">
+        <p className="text-red-400">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-2 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
         >
           Retry
         </button>
@@ -55,23 +53,23 @@ const Sent: React.FC<SentProps> = ({ token }) => {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-gray-900">Sent</h2>
+      <h2 className="text-2xl font-bold text-purple-400">Sent</h2>
       {mails.length === 0 ? (
-        <div className="bg-gray-50 rounded-lg p-8 text-center">
+        <div className="bg-gray-850 rounded-lg p-8 text-center">
           <p className="text-gray-500">No sent emails</p>
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-gray-850 shadow rounded-lg overflow-hidden divide-y divide-gray-700">
           {mails.map((mail, index) => (
-            <div key={index} className="border-b border-gray-200 p-4 hover:bg-gray-50">
+            <div key={index} className="p-4 hover:bg-gray-800 transition-colors duration-150 cursor-pointer">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-sm font-medium text-gray-900">To: {mail.to}</h3>
+                    <h3 className="text-sm font-medium text-purple-300">To: {mail.to}</h3>
                     <span className="text-xs text-gray-500">{new Date(mail.date).toLocaleDateString()}</span>
                   </div>
-                  <p className="text-sm font-medium text-gray-900 mb-1">{mail.subject}</p>
-                  <p className="text-sm text-gray-600 truncate">{mail.text}</p>
+                  <p className="text-sm font-semibold text-gray-200 mb-1">{mail.subject}</p>
+                  <p className="text-sm text-gray-400 truncate">{mail.text}</p>
                 </div>
               </div>
             </div>
