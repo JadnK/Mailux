@@ -10,6 +10,7 @@ const Sent: React.FC<SentProps> = ({ token }) => {
   const [mails, setMails] = useState<Mail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchMails = async () => {
@@ -60,20 +61,35 @@ const Sent: React.FC<SentProps> = ({ token }) => {
         </div>
       ) : (
         <div className="bg-gray-850 shadow rounded-lg overflow-hidden divide-y divide-gray-700">
-          {mails.map((mail, index) => (
-            <div key={index} className="p-4 hover:bg-gray-800 transition-colors duration-150 cursor-pointer">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-sm font-medium text-purple-300">To: {mail.to}</h3>
-                    <span className="text-xs text-gray-500">{new Date(mail.date).toLocaleDateString()}</span>
+          {mails.map((mail, index) => {
+            const isExpanded = index === expandedIndex;
+            return (
+              <div
+                key={index}
+                className="p-4 hover:bg-gray-800 transition-colors duration-150 cursor-pointer"
+                onClick={() =>
+                  setExpandedIndex(isExpanded ? null : index)
+                }
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="text-sm font-medium text-purple-300">To: {mail.to}</h3>
+                      <span className="text-xs text-gray-500">{new Date(mail.date).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-200 mb-1">{mail.subject}</p>
                   </div>
-                  <p className="text-sm font-semibold text-gray-200 mb-1">{mail.subject}</p>
-                  <p className="text-sm text-gray-400 truncate">{mail.text}</p>
                 </div>
+
+                {/* Expanded Content */}
+                {isExpanded && (
+                  <div className="mt-2 text-gray-400 whitespace-pre-line text-sm">
+                    {mail.text}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
