@@ -8,7 +8,6 @@ export const login = async (username: string, password: string) => {
 
     const data = await res.json();
 
-    // nur auf username prüfen, kein token nötig
     if (!data.username) {
       throw new Error("Invalid credentials");
     }

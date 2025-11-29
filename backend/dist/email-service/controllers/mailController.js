@@ -1,7 +1,25 @@
 import { sendMail, getInbox, getSent, replyMail, createFolder, getFolders } from "../services/mailService.js";
+import jwt from "jsonwebtoken";
+// Helper function to extract username and password from JWT token
+const getUserCredentialsFromToken = (req) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        throw new Error('No authorization header');
+    }
+    const token = authHeader.split(' ')[1]; // Bearer <token>
+    if (!token) {
+        throw new Error('No token provided');
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secretkey");
+    return {
+        username: decoded.username,
+        password: decoded.password
+    };
+};
 export const sendEmail = async (req, res) => {
     try {
-        const info = await sendMail(req.body);
+        const { username, password } = getUserCredentialsFromToken(req);
+        const info = await sendMail(req.body, username, password);
         res.status(200).json({ message: "Mail sent", id: info.messageId });
     }
     catch (err) {
@@ -9,16 +27,29 @@ export const sendEmail = async (req, res) => {
     }
 };
 export const getInboxMails = async (req, res) => {
-    const mails = await getInbox(req.params.username);
-    res.json(mails);
+    try {
+        const { username, password } = getUserCredentialsFromToken(req);
+        const mails = await getInbox(username, password);
+        res.json(mails);
+    }
+    catch (err) {
+        res.status(500).json({ message: "Failed to get inbox mails", error: err });
+    }
 };
 export const getSentMails = async (req, res) => {
-    const mails = await getSent(req.params.username);
-    res.json(mails);
+    try {
+        const { username, password } = getUserCredentialsFromToken(req);
+        const mails = await getSent(username, password);
+        res.json(mails);
+    }
+    catch (err) {
+        res.status(500).json({ message: "Failed to get sent mails", error: err });
+    }
 };
 export const replyEmail = async (req, res) => {
     try {
-        const info = await replyMail(req.body);
+        const { username, password } = getUserCredentialsFromToken(req);
+        const info = await replyMail(req.body, username, password);
         res.status(200).json({ message: "Reply sent", id: info.messageId });
     }
     catch (err) {
@@ -26,12 +57,23 @@ export const replyEmail = async (req, res) => {
     }
 };
 export const addFolder = (req, res) => {
-    const { username, folderName } = req.body;
-    const updatedFolders = createFolder(username, folderName);
-    res.json(updatedFolders);
+    try {
+        const { username, password } = getUserCredentialsFromToken(req);
+        const { folderName } = req.body;
+        const updatedFolders = createFolder(username, folderName);
+        res.json(updatedFolders);
+    }
+    catch (err) {
+        res.status(500).json({ message: "Failed to add folder", error: err });
+    }
 };
 export const listFolders = (req, res) => {
-    const { username } = req.params;
-    const userFolders = getFolders(username);
-    res.json(userFolders);
+    try {
+        const { username, password } = getUserCredentialsFromToken(req);
+        const userFolders = getFolders(username);
+        res.json(userFolders);
+    }
+    catch (err) {
+        res.status(500).json({ message: "Failed to list folders", error: err });
+    }
 };

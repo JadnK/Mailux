@@ -1,30 +1,51 @@
-import { mailTransporter } from "../config/mail.js";
+import { getMailTransporter } from "../config/mail.js";
 import imaps from "imap-simple";
 import { simpleParser } from "mailparser";
-import { imapConfig } from "../config/imap.js";
-
+import { getImapConfig } from "../config/imap.js";
+import { MailData } from "../types/mail.js";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const MailComposer = require("nodemailer/lib/mail-composer");
 
-type MailData = Parameters<typeof mailTransporter.sendMail>[0];
 
-// --- Send Mail + speichern in Sent ---
-export const sendMail = async (mailData: MailData) => {
+export const sendMail = async (mailData: MailData, username: string, password: string) => {
   try {
-    const info = await mailTransporter.sendMail(mailData);
-    console.log("Mail sent:", info.messageId);
+    const transporter = getMailTransporter(username, password);
 
-    await saveToSent(mailData);
+    const defaultFrom = `${username}@jadenk.de`;
 
+  const finalMailData: MailData = {
+    ...mailData,
+    from: mailData.from?.trim() ? mailData.from : defaultFrom,
+    replyTo: mailData.replyTo || defaultFrom,
+    envelope: {
+      ...(mailData.envelope || {}),
+      from: mailData.envelope?.from?.trim() ? mailData.envelope.from : defaultFrom,
+      to: mailData.envelope?.to || mailData.to,
+    },
+  };
+
+    await transporter.verify();
+    console.log('SMTP reachable:', transporter.options.host, transporter.options.port);
+
+    const info = await transporter.sendMail(finalMailData);
+    console.log("=== SEND INFO ===");
+    console.log("messageId:", info.messageId);
+    console.log("accepted:", info.accepted);
+    console.log("rejected:", info.rejected);
+    console.log("response:", info.response);
+    console.log("envelope:", info.envelope);
+    console.log("=== END SEND INFO ===");
+
+    await saveToSent(finalMailData, username, password);
     return info;
   } catch (err) {
     console.error("Error sending mail:", err);
     throw err;
   }
 };
-
-export const saveToSent = async (mailData: MailData) => {
+export const saveToSent = async (mailData: MailData, username: string, password: string) => {
+  const imapConfig = getImapConfig(username, password);
   const connection = await imaps.connect(imapConfig);
 
   try {
@@ -38,8 +59,8 @@ export const saveToSent = async (mailData: MailData) => {
 };
 
 
-// --- Inbox abrufen ---
-export const getInbox = async (username: string) => {
+export const getInbox = async (username: string, password: string) => {
+  const imapConfig = getImapConfig(username, password);
   const connection = await imaps.connect(imapConfig);
   await connection.openBox("INBOX");
 
@@ -66,8 +87,8 @@ export const getInbox = async (username: string) => {
   return mails;
 };
 
-// --- Sent Mails abrufen ---
-export const getSent = async (username: string) => {
+export const getSent = async (username: string, password: string) => {
+  const imapConfig = getImapConfig(username, password);
   const connection = await imaps.connect(imapConfig);
   await connection.openBox("Sent");
 
@@ -92,12 +113,10 @@ export const getSent = async (username: string) => {
   return mails;
 };
 
-// --- Reply Mail ---
-export const replyMail = async (mailData: MailData) => {
-  return await sendMail(mailData);
+export const replyMail = async (mailData: MailData, username: string, password: string) => {
+  return await sendMail(mailData, username, password);
 };
 
-// --- Lokale Ordnerverwaltung ---
 let folders: Record<string, string[]> = {};
 
 export const createFolder = (username: string, folderName: string) => {

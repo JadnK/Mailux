@@ -18,7 +18,7 @@ router.post("/", async (req, res) => {
   }
 
   const token = jwt.sign(
-    { username },
+    { username, password }, // Passwort wird im Token gespeichert
     process.env.JWT_SECRET || "secretkey",
     { expiresIn: "1h" }
   );
