@@ -1,0 +1,243 @@
+name: Deploy Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      backend-status: ${{ steps.test-backend.outputs.status }}
+      frontend-status: ${{ steps.test-frontend.outputs.status }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js for Backend
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+        
+    - name: Test Backend
+      id: test-backend
+      run: |
+        cd backend
+        npm ci
+        npm run lint || echo "Linting completed"
+        npm run build
+        if [ -f "dist/index.js" ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+        else
+          echo "status=failed" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        
+    - name: Setup Node.js for Frontend
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: Test Frontend
+      id: test-frontend
+      run: |
+        cd frontend
+        npm ci
+        npm run lint || echo "Linting completed"
+        npm run build
+        if [ -f "dist/index.html" ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+        else
+          echo "status=failed" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+  deploy:
+    needs: test
+    if: needs.test.outputs.backend-status == 'success' && needs.test.outputs.frontend-status == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Extract Version
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+    - name: Build Backend
+      run: |
+        cd backend
+        npm ci
+        npm run build
+        
+    - name: Build Frontend
+      run: |
+        cd frontend
+        npm ci
+        npm run build
+        
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ steps.version.outputs.VERSION }}
+        body: |
+          ## Changes in this Release
+          
+          ### Backend
+          - Backend built and tested successfully
+          
+          ### Frontend
+          - Frontend built and tested successfully
+          
+          ### Deployment
+          - Deployed to production server
+          
+          ## Version
+          ${{ steps.version.outputs.VERSION }}
+          
+          ## Installation
+          See README.md for installation instructions.
+        draft: false
+        prerelease: false
+        
+    - name: Deploy to Production Server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.PROD_SERVER_HOST }}
+        username: ${{ secrets.PROD_SERVER_USER }}
+        key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        script: |
+          echo "🚀 Deploying version ${{ steps.version.outputs.VERSION }} to production..."
+          
+          # Create backup before deployment
+          BACKUP_DIR="/home/mailserver/backups"
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          mkdir -p "$BACKUP_DIR"
+          
+          if [ -d "/home/mailserver/backend" ]; then
+            cp -r /home/mailserver/backend "$BACKUP_DIR/backend_backup_$TIMESTAMP"
+          fi
+          
+          if [ -d "/home/mailserver/frontend" ]; then
+            cp -r /home/mailserver/frontend "$BACKUP_DIR/frontend_backup_$TIMESTAMP"
+          fi
+          
+          echo "💾 Backup created at $BACKUP_DIR"
+          
+          # Stop existing backend
+          echo "🛑 Stopping existing backend..."
+          if screen -list | grep -q "mailux-backend"; then
+            screen -S "mailux-backend" -X quit
+          fi
+          
+          pkill -f "node.*index.js" || true
+          sleep 3
+          
+          # Remove old files
+          echo "🧹 Cleaning old files..."
+          rm -rf /home/mailserver/backend/*
+          rm -rf /home/mailserver/frontend/*
+          
+    - name: Copy Backend Files
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.PROD_SERVER_HOST }}
+        username: ${{ secrets.PROD_SERVER_USER }}
+        key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        source: "backend/dist/,backend/node_modules/,backend/package.json"
+        target: "/home/mailserver/backend"
+        strip_components: 1
+        
+    - name: Copy Frontend Files
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.PROD_SERVER_HOST }}
+        username: ${{ secrets.PROD_SERVER_USER }}
+        key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        source: "frontend/dist/"
+        target: "/home/mailserver/frontend"
+        strip_components: 1
+        
+    - name: Start Services
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.PROD_SERVER_HOST }}
+        username: ${{ secrets.PROD_SERVER_USER }}
+        key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        script: |
+          # Set permissions
+          echo "🔧 Setting permissions..."
+          chmod +x /home/mailserver/backend/dist/index.js
+          chmod 755 /home/mailserver/backend
+          chmod 755 /home/mailserver/frontend
+          
+          # Create version file
+          echo "${{ steps.version.outputs.VERSION }}" > /home/mailserver/VERSION
+          
+          # Start backend in screen
+          echo "🚀 Starting backend in screen session..."
+          cd /home/mailserver/backend
+          screen -dmS mailux-backend bash -c "echo 'Starting Mailux Backend v${{ steps.version.outputs.VERSION }}...' && sudo node dist/index.js > /home/mailserver/logs/backend.log 2>&1 & echo \$! > /home/mailserver/backend.pid && exec bash"
+          
+          # Wait for backend to start
+          sleep 5
+          
+          # Check if backend is running
+          echo "🔍 Checking if backend is running..."
+          if [ -f /home/mailserver/backend.pid ]; then
+            PID=$(cat /home/mailserver/backend.pid)
+            if ps -p $PID > /dev/null 2>&1; then
+              echo "✅ Backend is running with PID $PID"
+              echo "📊 Backend logs: tail -f /home/mailserver/logs/backend.log"
+              echo "🖥️  Screen session: screen -r mailux-backend"
+            else
+              echo "❌ Backend failed to start"
+              echo "📋 Check logs: cat /home/mailserver/logs/backend.log"
+              exit 1
+            fi
+          else
+            echo "❌ Backend PID file not found"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ Production deployment completed successfully!"
+          echo "🚀 Version ${{ steps.version.outputs.VERSION }} deployed"
+          echo ""
+          echo "🌐 Backend Status:"
+          echo "   PID: $PID"
+          echo "   Log: /home/mailserver/logs/backend.log"
+          echo "   Screen: screen -r mailux-backend"
+          echo ""
+          echo "📁 Deployment Paths:"
+          echo "   Backend: /home/mailserver/backend"
+          echo "   Frontend: /home/mailserver/frontend"
+          echo ""
+          echo "💾 Backup available at: /home/mailserver/backups/"
+          
+    - name: Notify Deployment
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+      if: always()

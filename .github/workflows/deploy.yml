@@ -1,0 +1,146 @@
+name: Deploy Mailux to Server
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+        
+    - name: Build Backend
+      run: |
+        cd backend
+        npm ci
+        npm run build
+        
+    - name: Setup Node.js for Frontend
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: Build Frontend
+      run: |
+        cd frontend
+        npm ci
+        npm run build
+        
+    - name: Deploy to Server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          # Stop existing backend
+          echo "🛑 Stopping existing backend..."
+          if screen -list | grep -q "mailux-backend"; then
+            screen -S "mailux-backend" -X quit
+          fi
+          
+          # Wait for process to stop
+          sleep 2
+          
+          # Create directories
+          echo "📁 Creating directories..."
+          mkdir -p /home/mailserver/backend
+          mkdir -p /home/mailserver/frontend
+          mkdir -p /home/mailserver/logs
+          
+          # Remove old files
+          echo "🧹 Cleaning old files..."
+          rm -rf /home/mailserver/backend/*
+          rm -rf /home/mailserver/frontend/*
+          
+          # Copy backend files
+          echo "📋 Copying backend files..."
+          mkdir -p /tmp/backend-deploy
+          cd /tmp/backend-deploy
+          
+          # Backend deployment commands will be executed via SCP
+          
+    - name: Copy Backend Files
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: "backend/dist/,backend/node_modules/,backend/package.json"
+        target: "/home/mailserver/backend"
+        strip_components: 1
+        
+    - name: Copy Frontend Files
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: "frontend/dist/"
+        target: "/home/mailserver/frontend"
+        strip_components: 1
+        
+    - name: Start Backend
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          # Set permissions
+          echo "🔧 Setting permissions..."
+          chmod +x /home/mailserver/backend/dist/index.js
+          chmod 755 /home/mailserver/backend
+          chmod 755 /home/mailserver/frontend
+          
+          # Start backend in screen
+          echo "🚀 Starting backend in screen session..."
+          cd /home/mailserver/backend
+          screen -dmS mailux-backend bash -c "echo 'Starting Mailux Backend...' && sudo node dist/index.js > /home/mailserver/logs/backend.log 2>&1 & echo \$! > /home/mailserver/backend.pid && exec bash"
+          
+          # Wait for backend to start
+          sleep 5
+          
+          # Check if backend is running
+          echo "🔍 Checking if backend is running..."
+          if [ -f /home/mailserver/backend.pid ]; then
+            PID=$(cat /home/mailserver/backend.pid)
+            if ps -p $PID > /dev/null 2>&1; then
+              echo "✅ Backend is running with PID $PID"
+              echo "📊 Backend logs: tail -f /home/mailserver/logs/backend.log"
+              echo "🖥️  Screen session: screen -r mailux-backend"
+            else
+              echo "❌ Backend failed to start"
+              echo "📋 Check logs: cat /home/mailserver/logs/backend.log"
+              exit 1
+            fi
+          else
+            echo "❌ Backend PID file not found"
+            exit 1
+          fi
+          
+          echo "✅ Deployment completed successfully!"
+          echo ""
+          echo "🌐 Backend Status:"
+          echo "   PID: $PID"
+          echo "   Log: /home/mailserver/logs/backend.log"
+          echo "   Screen: screen -r mailux-backend"
+          echo ""
+          echo "📁 Deployment Paths:"
+          echo "   Backend: /home/mailserver/backend"
+          echo "   Frontend: /home/mailserver/frontend"

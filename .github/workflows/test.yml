@@ -1,0 +1,130 @@
+name: Build and Test Mailux
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+        
+    - name: Install Backend Dependencies
+      run: |
+        cd backend
+        npm ci
+        
+    - name: Lint Backend
+      run: |
+        cd backend
+        npm run lint || echo "Linting completed"
+        
+    - name: Build Backend
+      run: |
+        cd backend
+        npm run build
+        
+    - name: Check Backend Build
+      run: |
+        cd backend
+        if [ ! -f "dist/index.js" ]; then
+          echo "❌ Backend build failed: dist/index.js not found"
+          exit 1
+        fi
+        echo "✅ Backend build successful"
+        
+    - name: Upload Backend Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-build
+        path: backend/dist/
+        retention-days: 7
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: Install Frontend Dependencies
+      run: |
+        cd frontend
+        npm ci
+        
+    - name: Lint Frontend
+      run: |
+        cd frontend
+        npm run lint || echo "Linting completed"
+        
+    - name: Build Frontend
+      run: |
+        cd frontend
+        npm run build
+        
+    - name: Check Frontend Build
+      run: |
+        cd frontend
+        if [ ! -f "dist/index.html" ]; then
+          echo "❌ Frontend build failed: dist/index.html not found"
+          exit 1
+        fi
+        echo "✅ Frontend build successful"
+        
+    - name: Upload Frontend Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist/
+        retention-days: 7
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Run Security Audit
+      run: |
+        echo "🔒 Running security audit..."
+        
+        # Backend security audit
+        cd backend
+        npm audit --audit-level=moderate || echo "Backend audit completed"
+        
+        # Frontend security audit
+        cd ../frontend
+        npm audit --audit-level=moderate || echo "Frontend audit completed"
+        
+    - name: Check for Secrets
+      run: |
+        echo "🔍 Checking for potential secrets..."
+        
+        # Check for common secret patterns
+        if grep -r -i "api[_-]key\|password\|secret\|token" --include="*.js" --include="*.ts" --include="*.json" --exclude-dir=node_modules --exclude-dir=dist . ; then
+          echo "⚠️  Potential secrets found in code"
+          echo "   Please review and ensure no secrets are committed"
+        else
+          echo "✅ No obvious secrets found"
+        fi

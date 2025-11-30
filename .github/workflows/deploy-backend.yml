@@ -1,0 +1,123 @@
+name: Deploy Backend Only
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+        
+    - name: Install Backend Dependencies
+      run: |
+        cd backend
+        npm ci
+        
+    - name: Build Backend
+      run: |
+        cd backend
+        npm run build
+        
+    - name: Verify Backend Build
+      run: |
+        cd backend
+        if [ ! -f "dist/index.js" ]; then
+          echo "❌ Backend build failed: dist/index.js not found"
+          exit 1
+        fi
+        echo "✅ Backend build successful"
+        
+    - name: Deploy Backend to Server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          # Stop existing backend
+          echo "🛑 Stopping existing backend..."
+          if screen -list | grep -q "mailux-backend"; then
+            screen -S "mailux-backend" -X quit
+          fi
+          
+          # Kill any remaining node processes
+          echo "🔨 Killing any remaining node processes..."
+          pkill -f "node.*index.js" || true
+          sleep 2
+          
+          # Remove old backend files
+          echo "🧹 Cleaning old backend files..."
+          rm -rf /home/mailserver/backend/*
+          
+    - name: Copy Backend Files
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: "backend/dist/,backend/node_modules/,backend/package.json"
+        target: "/home/mailserver/backend"
+        strip_components: 1
+        
+    - name: Start Backend
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          # Set permissions
+          echo "🔧 Setting permissions..."
+          chmod +x /home/mailserver/backend/dist/index.js
+          chmod 755 /home/mailserver/backend
+          
+          # Create logs directory
+          mkdir -p /home/mailserver/logs
+          
+          # Start backend in screen
+          echo "🚀 Starting backend in screen session..."
+          cd /home/mailserver/backend
+          screen -dmS mailux-backend bash -c "echo 'Starting Mailux Backend...' && sudo node dist/index.js > /home/mailserver/logs/backend.log 2>&1 & echo \$! > /home/mailserver/backend.pid && exec bash"
+          
+          # Wait for backend to start
+          sleep 5
+          
+          # Check if backend is running
+          echo "🔍 Checking if backend is running..."
+          if [ -f /home/mailserver/backend.pid ]; then
+            PID=$(cat /home/mailserver/backend.pid)
+            if ps -p $PID > /dev/null 2>&1; then
+              echo "✅ Backend is running with PID $PID"
+              echo "📊 Backend logs: tail -f /home/mailserver/logs/backend.log"
+              echo "🖥️  Screen session: screen -r mailux-backend"
+            else
+              echo "❌ Backend failed to start"
+              echo "📋 Check logs: cat /home/mailserver/logs/backend.log"
+              exit 1
+            fi
+          else
+            echo "❌ Backend PID file not found"
+            exit 1
+          fi
+          
+          echo "✅ Backend deployment completed successfully!"
+          echo ""
+          echo "🌐 Backend Status:"
+          echo "   PID: $PID"
+          echo "   Log: /home/mailserver/logs/backend.log"
+          echo "   Screen: screen -r mailux-backend"
