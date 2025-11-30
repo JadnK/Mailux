@@ -194,8 +194,8 @@ jobs:
           # Start backend in screen
           echo "🚀 Starting backend in screen session..."
           cd /home/mailserver/backend
-          #screen -dmS mailux-backend bash -c "echo 'Starting Mailux Backend v${{ steps.version.outputs.VERSION }}...' && sudo node dist/index.js > /home/mailserver/logs/backend.log 2>&1 & echo \$! > /home/mailserver/backend.pid && exec bash"
-          screen -dmS mailux-backend node dist/index.js 
+          screen -dmS mailux-backend bash -c "echo 'Starting Mailux Backend v${{ steps.version.outputs.VERSION }}...' && sudo node dist/index.js > /home/mailserver/logs/backend.log 2>&1 & echo \$! > /home/mailserver/backend.pid && exec bash"
+          #screen -dmS mailux-backend node dist/index.js 
 
           # Wait for backend to start
           sleep 5
