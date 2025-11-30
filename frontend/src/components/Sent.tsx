@@ -11,6 +11,7 @@ const Sent: React.FC<SentProps> = ({ token }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchMails = async () => {
@@ -29,6 +30,35 @@ const Sent: React.FC<SentProps> = ({ token }) => {
 
     if (token) fetchMails();
   }, [token]);
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const handleDelete = async (mail: Mail) => {
+    if (!mail.uid) return;
+
+    try {
+      setDeletingId(mail.uid);
+      await mailAPI.deleteMail('Sent', mail.uid);
+      
+      // Remove from local state
+      setMails(prev => prev.filter(m => m.uid !== mail.uid));
+      setExpandedIndex(null);
+    } catch (err) {
+      console.error('Error deleting mail:', err);
+      setError('Failed to delete mail. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -63,28 +93,44 @@ const Sent: React.FC<SentProps> = ({ token }) => {
         <div className="bg-gray-850 shadow rounded-lg overflow-hidden divide-y divide-gray-700">
           {mails.map((mail, index) => {
             const isExpanded = index === expandedIndex;
+            
             return (
               <div
                 key={index}
-                className="p-4 hover:bg-gray-800 transition-colors duration-150 cursor-pointer"
-                onClick={() =>
-                  setExpandedIndex(isExpanded ? null : index)
-                }
+                className="p-4 hover:bg-gray-800 transition-colors duration-150"
               >
                 <div className="flex justify-between items-start">
-                  <div className="flex-1">
+                  <div className="flex-1 cursor-pointer" onClick={() =>
+                    setExpandedIndex(isExpanded ? null : index)
+                  }>
                     <div className="flex items-center justify-between mb-1">
                       <h3 className="text-sm font-medium text-purple-300">To: {mail.to}</h3>
-                      <span className="text-xs text-gray-500">{new Date(mail.date).toLocaleDateString()}</span>
+                      <span className="text-xs text-gray-500">{formatDateTime(mail.date)}</span>
                     </div>
                     <p className="text-sm font-semibold text-gray-200 mb-1">{mail.subject}</p>
+                    <p className="text-xs text-gray-400 line-clamp-1">
+                      {mail.text.substring(0, 100)}{mail.text.length > 100 ? '...' : ''}
+                    </p>
                   </div>
                 </div>
 
                 {/* Expanded Content */}
                 {isExpanded && (
-                  <div className="mt-2 text-gray-400 whitespace-pre-line text-sm">
-                    {mail.text}
+                  <div className="mt-4 space-y-4">
+                    <div className="text-gray-400 whitespace-pre-line text-sm bg-gray-900 p-3 rounded">
+                      {mail.text}
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleDelete(mail)}
+                        disabled={deletingId === mail.uid}
+                        className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {deletingId === mail.uid ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

@@ -1,8 +1,7 @@
 import { Request, Response } from "express";
-import { sendMail, getInbox, getSent, replyMail, createFolder, getFolders } from "../services/mailService.js";
+import { sendMail, getInbox, getSent, replyMail, createFolder, getFolders, deleteMail } from "../services/mailService.js";
 import jwt from "jsonwebtoken";
 
-// Helper function to extract username and password from JWT token
 const getUserCredentialsFromToken = (req: Request): { username: string; password: string } => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
@@ -79,5 +78,22 @@ export const listFolders = (req: Request, res: Response) => {
     res.json(userFolders);
   } catch (err) {
     res.status(500).json({ message: "Failed to list folders", error: err });
+  }
+};
+
+export const deleteEmail = async (req: Request, res: Response) => {
+  try {
+    const { username, password } = getUserCredentialsFromToken(req);
+    const { mailbox, uid } = req.body;
+    
+    if (!mailbox || !uid) {
+      return res.status(400).json({ message: "Mailbox and UID are required" });
+    }
+    
+    await deleteMail(username, password, mailbox, uid);
+    res.status(200).json({ message: "Mail deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting mail:", err);
+    res.status(500).json({ message: "Failed to delete mail", error: err });
   }
 };

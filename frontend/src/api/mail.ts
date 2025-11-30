@@ -42,6 +42,11 @@ export const mailAPI = {
     return response.data;
   },
   
+  deleteMail: async (mailbox: string, uid: number) => {
+    const response = await api.delete('/mail/delete', { data: { mailbox, uid } });
+    return response.data;
+  },
+  
   getFolders: async () => {
     const response = await api.get('/mail/folder/dummy');
     return response.data;

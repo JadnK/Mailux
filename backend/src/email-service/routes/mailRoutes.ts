@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { sendEmail, getInboxMails, getSentMails, replyEmail, addFolder, listFolders } from "../controllers/mailController.js";
+import { sendEmail, getInboxMails, getSentMails, replyEmail, addFolder, listFolders, deleteEmail} from "../controllers/mailController.js";
 
 //import { testConnection } from "../config/mail.js";
 
@@ -13,5 +13,6 @@ router.get("/sent/:username", getSentMails);
 router.post("/reply", replyEmail);
 router.post("/folder", addFolder);
 router.get("/folder/:username", listFolders);
+router.delete("/delete", deleteEmail);
 
 export default router;

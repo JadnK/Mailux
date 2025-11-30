@@ -63,6 +63,7 @@ export const getInbox = async (username, password) => {
         const allParts = msg.parts.find((p) => p.which === "");
         const parsed = await simpleParser(allParts.body);
         const mailData = {
+            uid: msg.attributes.uid, // Add UID for deletion
             from: parsed.from?.text || "",
             to: parsed.to?.text || "",
             subject: parsed.subject || "",
@@ -73,7 +74,8 @@ export const getInbox = async (username, password) => {
         return mailData;
     }));
     connection.end();
-    return mails;
+    // Sort by date (newest first)
+    return mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
 export const getSent = async (username, password) => {
     const imapConfig = getImapConfig(username, password);
@@ -84,6 +86,7 @@ export const getSent = async (username, password) => {
         const allParts = msg.parts.find((p) => p.which === "");
         const parsed = await simpleParser(allParts.body);
         return {
+            uid: msg.attributes.uid, // Add UID for deletion
             from: parsed.from?.text || "",
             to: parsed.to?.text || "",
             subject: parsed.subject || "",
@@ -93,7 +96,8 @@ export const getSent = async (username, password) => {
         };
     }));
     connection.end();
-    return mails;
+    // Sort by date (newest first)
+    return mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
 export const replyMail = async (mailData, username, password) => {
     return await sendMail(mailData, username, password);
@@ -108,4 +112,23 @@ export const createFolder = (username, folderName) => {
 };
 export const getFolders = (username) => {
     return folders[username] || [];
+};
+export const deleteMail = async (username, password, mailbox, mailUid) => {
+    const imapConfig = getImapConfig(username, password);
+    const connection = await imaps.connect(imapConfig);
+    try {
+        await connection.openBox(mailbox);
+        // Mark the message for deletion
+        await connection.addFlags(mailUid, ['\\Deleted']);
+        // Expunge to permanently delete the message
+        await connection.imap.expunge();
+        return true;
+    }
+    catch (error) {
+        console.error('Error deleting mail:', error);
+        throw error;
+    }
+    finally {
+        await connection.end();
+    }
 };
