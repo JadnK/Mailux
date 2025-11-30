@@ -40,7 +40,7 @@ const SendMailForm: React.FC<SendMailFormProps> = ({ token, username, onMailSent
       // Initialize form with signature
       setFormData(prev => ({
         ...prev,
-        text: userSettings.signature ? `\n\n--\n${userSettings.signature}` : ''
+        text: userSettings.signature ? `Hallo, \n\n\n${userSettings.signature}` : ''
       }));
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to load settings' });
@@ -65,7 +65,7 @@ const SendMailForm: React.FC<SendMailFormProps> = ({ token, username, onMailSent
       setSuccess(true);
       
       // Reset form with signature
-      setFormData({ to: '', subject: '', text: settings.signature ? `\n\n--\n${settings.signature}` : '', html: '' });
+      setFormData({ to: '', subject: '', text: settings.signature ? `Hallo,\n\n\n${settings.signature}` : '', html: '' });
       
       if (onMailSent) onMailSent();
     } catch (err) {
