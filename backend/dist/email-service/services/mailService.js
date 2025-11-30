@@ -5,7 +5,6 @@ import { getImapConfig } from "../config/imap.js";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const MailComposer = require("nodemailer/lib/mail-composer");
-// --- Send Mail + speichern in Sent ---
 export const sendMail = async (mailData, username, password) => {
     try {
         const transporter = getMailTransporter(username, password);
@@ -50,7 +49,6 @@ export const saveToSent = async (mailData, username, password) => {
         await connection.end();
     }
 };
-// --- Inbox abrufen ---
 export const getInbox = async (username, password) => {
     const imapConfig = getImapConfig(username, password);
     const connection = await imaps.connect(imapConfig);
@@ -73,7 +71,6 @@ export const getInbox = async (username, password) => {
     connection.end();
     return mails;
 };
-// --- Sent Mails abrufen ---
 export const getSent = async (username, password) => {
     const imapConfig = getImapConfig(username, password);
     const connection = await imaps.connect(imapConfig);
@@ -94,11 +91,9 @@ export const getSent = async (username, password) => {
     connection.end();
     return mails;
 };
-// --- Reply Mail ---
 export const replyMail = async (mailData, username, password) => {
     return await sendMail(mailData, username, password);
 };
-// --- Lokale Ordnerverwaltung ---
 let folders = {};
 export const createFolder = (username, folderName) => {
     if (!folders[username])

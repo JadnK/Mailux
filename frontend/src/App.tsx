@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import InboxPage from './pages/InboxPage';
 import SentPage from './pages/SentPage';
 import ComposePage from './pages/ComposePage';
+import SettingsPage from './pages/SettingsPage';
 import './index.css';
 
 const App: React.FC = () => {
@@ -12,6 +13,7 @@ const App: React.FC = () => {
         <Route path="/" element={<InboxPage />} />
         <Route path="/sent" element={<SentPage />} />
         <Route path="/compose" element={<ComposePage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Routes>
     </Router>
   );

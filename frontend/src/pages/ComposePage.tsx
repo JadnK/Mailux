@@ -34,7 +34,7 @@ const ComposePage: React.FC = () => {
   }
 
   return (
-    <Layout token={token} onLogout={handleLogout} />
+    <Layout token={token} username={username} onLogout={handleLogout} />
   );
 };
 
