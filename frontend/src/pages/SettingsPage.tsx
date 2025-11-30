@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import LoginPage from './LoginPage';
 
-const SentPage: React.FC = () => {
+const SettingsPage: React.FC = () => {
   const [token, setToken] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
 
@@ -38,4 +38,4 @@ const SentPage: React.FC = () => {
   );
 };
 
-export default SentPage;
+export default SettingsPage;
