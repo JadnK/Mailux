@@ -2,20 +2,24 @@ import { getMailTransporter } from "../config/mail.js";
 import imaps from "imap-simple";
 import { simpleParser } from "mailparser";
 import { getImapConfig } from "../config/imap.js";
+import { getUserSettings } from "../../settings-service/services/settingsService.js";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const MailComposer = require("nodemailer/lib/mail-composer");
 export const sendMail = async (mailData, username, password) => {
     try {
         const transporter = getMailTransporter(username, password);
-        const defaultFrom = `${username}@jadenk.de`;
+        const userSettings = getUserSettings(username);
+        const defaultEmail = `${username}@jadenk.de`;
+        const displayName = userSettings.name || username;
+        const formattedFrom = `"${displayName}" <${defaultEmail}>`;
         const finalMailData = {
             ...mailData,
-            from: mailData.from?.trim() ? mailData.from : defaultFrom,
-            replyTo: mailData.replyTo || defaultFrom,
+            from: mailData.from?.trim() ? mailData.from : formattedFrom,
+            replyTo: mailData.replyTo || formattedFrom,
             envelope: {
                 ...(mailData.envelope || {}),
-                from: mailData.envelope?.from?.trim() ? mailData.envelope.from : defaultFrom,
+                from: mailData.envelope?.from?.trim() ? mailData.envelope.from : formattedFrom,
                 to: mailData.envelope?.to || mailData.to,
             },
         };
