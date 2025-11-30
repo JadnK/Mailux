@@ -107,8 +107,17 @@ jobs:
           echo "🔧 Setting ownership and permissions for frontend..."
           sudo chown -R www-data:www-data /home/mailserver/frontend
           sudo chmod -R 755 /home/mailserver/frontend
-          sudo chown -R nginx:nginx /usr/share/nginx/html && nginx -g 'daemon off;'
           echo "✅ Frontend ownership and permissions set"
+
+          # Docker Compose neu starten
+          echo "⏹️ Stoppe Frontend-Container..."
+          sudo docker-compose -f /home/mailserver/frontend/docker-compose.yml down
+
+          echo "▶️ Starte Frontend-Container im Hintergrund..."
+          sudo docker-compose -f /home/mailserver/frontend/docker-compose.yml up -d
+
+          echo "✅ Frontend erfolgreich neu gestartet"
+
 
     - name: Start Backend
       uses: appleboy/ssh-action@v1.0.0
