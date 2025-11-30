@@ -7,7 +7,6 @@ const __dirname = path.dirname(__filename);
 
 const CONFIG_PATH = path.join(__dirname, '../../../config.json');
 
-// User Settings Interface
 interface UserSettings {
   name: string;
   signature: string;
@@ -16,7 +15,6 @@ interface UserSettings {
   vacationMessage?: string;
 }
 
-// Global Backend-Einstellungen
 interface GlobalSettings {
   defaultSignature: string;
   maxStorageMB: number;
@@ -31,11 +29,9 @@ interface ConfigData {
   userSettings: { [username: string]: UserSettings };
 }
 
-// Load config from file
 function loadConfig(): ConfigData {
   try {
     if (!fs.existsSync(CONFIG_PATH)) {
-      // Create default config if it doesn't exist
       const defaultConfig: ConfigData = {
         globalSettings: {
           defaultSignature: "Sent with Mailux",
@@ -50,7 +46,6 @@ function loadConfig(): ConfigData {
     return JSON.parse(data);
   } catch (error) {
     console.error('Error loading config:', error);
-    // Return default config on error
     return {
       globalSettings: {
         defaultSignature: "Sent with Mailux",
@@ -61,7 +56,6 @@ function loadConfig(): ConfigData {
   }
 }
 
-// Save config to file
 function saveConfig(config: ConfigData): void {
   try {
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
@@ -71,7 +65,6 @@ function saveConfig(config: ConfigData): void {
   }
 }
 
-// Default Settings
 let globalSettings: GlobalSettings = loadConfig().globalSettings;
 let userSettings: { [username: string]: UserSettings } = loadConfig().userSettings;
 
@@ -92,7 +85,6 @@ export const updateGlobalSettings = (updates: Partial<GlobalSettings>): GlobalSe
 export const getUserSettings = (username: string): UserSettings => {
   const config = loadConfig();
   if (!config.userSettings[username]) {
-    // Create default user settings if they don't exist
     config.userSettings[username] = {
       name: username,
       signature: config.globalSettings.defaultSignature,

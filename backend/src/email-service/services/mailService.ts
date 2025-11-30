@@ -93,7 +93,6 @@ export const getInbox = async (username: string, password: string) => {
 
   connection.end();
   
-  // Sort by date (newest first)
   return mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
 
@@ -109,7 +108,7 @@ export const getSent = async (username: string, password: string) => {
       const allParts = msg.parts.find((p: any) => p.which === "");
       const parsed = await simpleParser(allParts.body);
       return {
-        uid: msg.attributes.uid, // Add UID for deletion
+        uid: msg.attributes.uid, 
         from: parsed.from?.text || "",
         to: parsed.to?.text || "",
         subject: parsed.subject || "",
@@ -122,7 +121,6 @@ export const getSent = async (username: string, password: string) => {
 
   connection.end();
   
-  // Sort by date (newest first)
   return mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
 
@@ -149,10 +147,8 @@ export const deleteMail = async (username: string, password: string, mailbox: st
   try {
     await connection.openBox(mailbox);
     
-    // Mark the message for deletion
     await connection.addFlags(mailUid, ['\\Deleted']);
     
-    // Expunge to permanently delete the message
     await connection.imap.expunge();
     
     return true;

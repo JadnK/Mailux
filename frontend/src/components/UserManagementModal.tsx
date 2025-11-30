@@ -66,7 +66,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({
       setNewUsername('');
       setNewPassword('');
       setShowAddUser(false);
-      fetchUsers(); // Refresh the user list
+      fetchUsers();
     } catch (err) {
       setError('Failed to create user');
       console.error(err);

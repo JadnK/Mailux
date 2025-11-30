@@ -12,13 +12,13 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    await authenticateUser(username, password, "login"); // PAM-Service "login"
+    await authenticateUser(username, password, "login"); 
   } catch (err: any) {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
   const token = jwt.sign(
-    { username, password }, // Passwort wird im Token gespeichert
+    { username, password }, 
     process.env.JWT_SECRET || "secretkey",
     { expiresIn: "1h" }
   );
