@@ -126,7 +126,7 @@ const Layout: React.FC<LayoutProps> = ({ token, username, onLogout }) => {
             <div className="px-4 py-6 sm:px-0">
               {location.pathname === '/' && <Inbox token={token} />}
               {location.pathname === '/sent' && <Sent token={token} />}
-              {location.pathname === '/compose' && <SendMailForm token={token} />}
+              {location.pathname === '/compose' && username && <SendMailForm token={token} username={username}/>}
               {location.pathname === '/settings' && username && <Settings token={token} username={username} />}
             </div>
           </div>
