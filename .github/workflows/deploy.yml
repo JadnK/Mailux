@@ -107,6 +107,7 @@ jobs:
           echo "🔧 Setting ownership and permissions for frontend..."
           sudo chown -R www-data:www-data /home/mailserver/frontend
           sudo chmod -R 755 /home/mailserver/frontend
+          sudo chown -R nginx:nginx /usr/share/nginx/html && nginx -g 'daemon off;'
           echo "✅ Frontend ownership and permissions set"
 
     - name: Start Backend
