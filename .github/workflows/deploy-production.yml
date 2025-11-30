@@ -33,6 +33,8 @@ jobs:
       id: test-backend
       run: |
         cd backend
+        sudo apt-get update
+        sudo apt-get install -y libpam0g-dev build-essential python3
         npm ci
         npm run lint || echo "Linting completed"
         npm run build
@@ -90,6 +92,8 @@ jobs:
       
     - name: Build Backend
       run: |
+        sudo apt-get update
+        sudo apt-get install -y libpam0g-dev build-essential python3
         cd backend
         npm ci
         npm run build

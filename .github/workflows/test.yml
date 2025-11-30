@@ -13,6 +13,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    
       
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -33,6 +35,8 @@ jobs:
         
     - name: Build Backend
       run: |
+        sudo apt-get update
+        sudo apt-get install -y libpam0g-dev build-essential python3
         cd backend
         npm run build
         
