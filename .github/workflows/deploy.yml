@@ -56,7 +56,7 @@ jobs:
             screen -S "mailux-backend" -X quit
           fi
           
-          # Wait for process to stop
+          # Wait for process to stopp
           sleep 2
           
           # Create directories
