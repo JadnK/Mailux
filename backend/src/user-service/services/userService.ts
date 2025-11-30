@@ -146,6 +146,29 @@ export default class UserService {
   public getStoreSnapshot(): UserSettings[] {
     return Array.from(this.userSettingsStore.values());
   }
+
+  public async createUser(username: string, password: string): Promise<boolean> {
+    try {
+      const { execSync } = require('child_process');
+      
+      execSync(`sudo useradd -m -s /bin/bash "${username}"`, { stdio: 'pipe' });
+      execSync(`sudo mkdir -p /home/${username}/Maildir/{cur,new,tmp}`, { stdio: 'pipe' });
+      execSync(`sudo chown -R ${username}:${username} /home/${username}/Maildir`, { stdio: 'pipe' });
+      execSync(`sudo chmod -R 700 /home/${username}/Maildir`, { stdio: 'pipe' });
+      
+      execSync(`echo "${username}:${password}" | sudo chpasswd`, { stdio: 'pipe' });
+      
+      this.userSettingsStore.set(username, {
+        username,
+        canReceiveMail: true,
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      return false;
+    }
+  }
 }
 type PamModule = {
   authenticate?: (username: string, password: string, cb: (err: Error | null) => void) => void;
@@ -155,7 +178,6 @@ export const authenticateUser = (username: string, password: string, service = "
   return new Promise<boolean>((resolve, reject) => {
     let pam: PamModule | null = null;
     try {
-      // Lazy load - falls das Paket fehlt, bekommen wir hier eine klare Fehlermeldung
       pam = require("authenticate-pam") as PamModule;
     } catch (e: any) {
       console.error("authenticate-pam could not be required:", e && e.message);
@@ -164,7 +186,6 @@ export const authenticateUser = (username: string, password: string, service = "
 
     const cb = (err: Error | null) => {
       if (err) {
-        // Logge den PAM-Fehler, nicht das Passwort
         console.error(`PAM auth failed (user=${username}, service=${service}):`, err.message || err);
         return reject(err);
       }
@@ -172,13 +193,11 @@ export const authenticateUser = (username: string, password: string, service = "
     };
 
     try {
-      // Variante 1: modul hat eine `authenticate`-Funktion (häufig)
       if (pam && typeof (pam as any).authenticate === "function") {
         try {
           (pam as any).authenticate(username, password, cb);
           return;
         } catch (e) {
-          // Einige Implementationen erwarten (service, username, password, cb)
           try {
             (pam as any).authenticate(service, username, password, cb);
             return;
@@ -189,14 +208,11 @@ export const authenticateUser = (username: string, password: string, service = "
         }
       }
 
-      // Variante 2: paket exportiert direkt eine function: pam(...)
       if (typeof pam === "function") {
         try {
-          // try (username, password, cb)
           (pam as any)(username, password, cb);
           return;
         } catch (e) {
-          // try (service, username, password, cb)
           try {
             (pam as any)(service, username, password, cb);
             return;
@@ -207,7 +223,6 @@ export const authenticateUser = (username: string, password: string, service = "
         }
       }
 
-      // Unerwartete Export-Form
       return reject(new Error("authenticate-pam: unexpected export shape"));
     } catch (outerErr) {
       console.error("authenticate-pam invocation threw:", outerErr && (outerErr as Error).message);

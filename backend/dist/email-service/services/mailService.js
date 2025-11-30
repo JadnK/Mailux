@@ -24,15 +24,14 @@ export const sendMail = async (mailData, username, password) => {
             },
         };
         await transporter.verify();
-        console.log('SMTP reachable:', transporter.options.host, transporter.options.port);
         const info = await transporter.sendMail(finalMailData);
-        console.log("=== SEND INFO ===");
+        /*console.log("=== SEND INFO ===");
         console.log("messageId:", info.messageId);
         console.log("accepted:", info.accepted);
         console.log("rejected:", info.rejected);
         console.log("response:", info.response);
         console.log("envelope:", info.envelope);
-        console.log("=== END SEND INFO ===");
+        console.log("=== END SEND INFO ===");*/
         await saveToSent(finalMailData, username, password);
         return info;
     }
@@ -63,7 +62,7 @@ export const getInbox = async (username, password) => {
     const mails = await Promise.all(messages.map(async (msg) => {
         const allParts = msg.parts.find((p) => p.which === "");
         const parsed = await simpleParser(allParts.body);
-        return {
+        const mailData = {
             from: parsed.from?.text || "",
             to: parsed.to?.text || "",
             subject: parsed.subject || "",
@@ -71,6 +70,7 @@ export const getInbox = async (username, password) => {
             text: parsed.text || "",
             html: parsed.html || "",
         };
+        return mailData;
     }));
     connection.end();
     return mails;

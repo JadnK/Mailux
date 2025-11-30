@@ -4,15 +4,18 @@ import Inbox from './Inbox';
 import Sent from './Sent';
 import SendMailForm from './SendMailForm';
 import Settings from './Settings';
+import UserManagementModal from './UserManagementModal';
 
 interface LayoutProps {
   token: string;
   username?: string;
   onLogout: () => void;
+  onUserSwitch: (newToken: string, newUsername: string) => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ token, username, onLogout }) => {
+const Layout: React.FC<LayoutProps> = ({ token, username, onLogout, onUserSwitch }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showUserManagement, setShowUserManagement] = useState(false);
   const location = useLocation();
 
   const navigation = [
@@ -52,7 +55,10 @@ const Layout: React.FC<LayoutProps> = ({ token, username, onLogout }) => {
           {/* User Info */}
           <div className="p-4 border-t border-gray-700">
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
+              <div 
+                className="flex items-center cursor-pointer hover:bg-gray-700 rounded-lg p-2 transition-colors"
+                onClick={() => setShowUserManagement(true)}
+              >
                 <div className="user-avatar">
                   <span className="text-white text-sm font-medium">
                     {username ? username.charAt(0).toUpperCase() : 'U'}
@@ -62,7 +68,7 @@ const Layout: React.FC<LayoutProps> = ({ token, username, onLogout }) => {
                   <p className="text-sm font-medium text-gray-300">
                     {username || 'User'}
                   </p>
-                  <p className="text-xs text-gray-500">Online</p>
+                  <p className="text-xs text-gray-500">Click to manage</p>
                 </div>
               </div>
             </div>
@@ -101,7 +107,10 @@ const Layout: React.FC<LayoutProps> = ({ token, username, onLogout }) => {
             </h1>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="flex items-center">
+            <div 
+              className="flex items-center cursor-pointer hover:bg-gray-700 rounded-lg p-2 transition-colors"
+              onClick={() => setShowUserManagement(true)}
+            >
               <div className="user-avatar">
                 <span className="text-white text-sm font-medium">
                   {username ? username.charAt(0).toUpperCase() : 'U'}
@@ -140,6 +149,15 @@ const Layout: React.FC<LayoutProps> = ({ token, username, onLogout }) => {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      {/* User Management Modal */}
+      <UserManagementModal
+        isOpen={showUserManagement}
+        onClose={() => setShowUserManagement(false)}
+        currentToken={token}
+        onUserSwitch={onUserSwitch}
+        currentUsername={username || ''}
+      />
     </div>
   );
 };

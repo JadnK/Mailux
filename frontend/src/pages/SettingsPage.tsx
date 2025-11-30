@@ -20,6 +20,15 @@ const SettingsPage: React.FC = () => {
   const handleLogin = (newToken: string, newUsername: string) => {
     setToken(newToken);
     setUsername(newUsername);
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('username', newUsername);
+  };
+
+  const handleUserSwitch = (newToken: string, newUsername: string) => {
+    setToken(newToken);
+    setUsername(newUsername);
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('username', newUsername);
   };
 
   const handleLogout = () => {
@@ -34,7 +43,12 @@ const SettingsPage: React.FC = () => {
   }
 
   return (
-    <Layout token={token} username={username} onLogout={handleLogout} />
+    <Layout 
+      token={token} 
+      username={username} 
+      onLogout={handleLogout} 
+      onUserSwitch={handleUserSwitch}
+    />
   );
 };
 

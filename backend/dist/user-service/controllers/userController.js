@@ -56,3 +56,20 @@ export const deactivateUser = async (req, res) => {
         return res.status(500).json({ message: "Failed to deactivate user" });
     }
 };
+export const createUser = async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) {
+            return res.status(400).json({ message: "Username and password required" });
+        }
+        const success = await userService.createUser(username, password);
+        if (!success) {
+            return res.status(500).json({ message: "Failed to create user" });
+        }
+        return res.json({ message: "User created successfully", username });
+    }
+    catch (err) {
+        console.error("createUser error:", err);
+        return res.status(500).json({ message: "Failed to create user" });
+    }
+};
