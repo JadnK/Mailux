@@ -24,6 +24,8 @@ jobs:
         
     - name: Build Backend
       run: |
+        sudo apt-get update
+        sudo apt-get install -y libpam0g-dev build-essential python3
         cd backend
         npm install
         npm run build
@@ -37,8 +39,6 @@ jobs:
         
     - name: Build Frontend
       run: |
-        sudo apt-get update
-        sudo apt-get install -y libpam0g-dev build-essential python3
         cd frontend
         npm install
         npm run build
@@ -97,6 +97,18 @@ jobs:
         target: "/home/mailserver/frontend"
         strip_components: 1
         
+    - name: Set Frontend Permissions
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          echo "🔧 Setting ownership and permissions for frontend..."
+          sudo chown -R www-data:www-data /home/mailserver/frontend
+          sudo chmod -R 755 /home/mailserver/frontend
+          echo "✅ Frontend ownership and permissions set"
+
     - name: Start Backend
       uses: appleboy/ssh-action@v1.0.0
       with:
