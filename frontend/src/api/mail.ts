@@ -23,12 +23,12 @@ export const authAPI = {
 
 export const mailAPI = {
   getInbox: async () => {
-    const response = await api.get('/mail/inbox/dummy'); // Username wird jetzt aus Token extrahiert
+    const response = await api.get('/mail/inbox/dummy'); 
     return response.data;
   },
   
   getSent: async () => {
-    const response = await api.get('/mail/sent/dummy'); // Username wird jetzt aus Token extrahiert
+    const response = await api.get('/mail/sent/dummy');
     return response.data;
   },
   
@@ -43,7 +43,7 @@ export const mailAPI = {
   },
   
   getFolders: async () => {
-    const response = await api.get('/mail/folder/dummy'); // Username wird jetzt aus Token extrahiert
+    const response = await api.get('/mail/folder/dummy');
     return response.data;
   },
   

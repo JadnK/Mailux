@@ -90,6 +90,19 @@ const Settings: React.FC<SettingsProps> = ({ token, username }) => {
             />
           </div>
 
+          {/* Email Address (read-only) */}
+          <div>
+            <label className="form-label">
+                Email Address
+            </label>
+            <input
+                type="text"
+                value={`${username}@jadenk.de`}
+                readOnly
+                className="form-input bg-gray-800 text-gray-400 cursor-not-allowed"
+            />
+          </div>
+
           {/* Signature Setting */}
           <div>
             <label className="form-label">
@@ -105,7 +118,7 @@ const Settings: React.FC<SettingsProps> = ({ token, username }) => {
           </div>
 
           {/* Mail Receive Setting */}
-          <div className="flex items-center justify-between">
+          {/*<div className="flex items-center justify-between">
             <div>
               <label className="text-sm font-medium text-gray-300">
                 Receive Emails
@@ -125,10 +138,10 @@ const Settings: React.FC<SettingsProps> = ({ token, username }) => {
                 <div className="toggle-dot"></div>
               </div>
             </label>
-          </div>
+          </div>*/}
 
           {/* Vacation Mode Setting */}
-          <div className="flex items-center justify-between">
+          {/*<div className="flex items-center justify-between">
             <div>
               <label className="text-sm font-medium text-gray-300">
                 Vacation Mode
@@ -148,10 +161,10 @@ const Settings: React.FC<SettingsProps> = ({ token, username }) => {
                 <div className="toggle-dot"></div>
               </div>
             </label>
-          </div>
+          </div>*/}
 
           {/* Vacation Message */}
-          {settings.vacationMode && (
+          {/*settings.vacationMode && (
             <div>
               <label className="form-label">
                 Vacation Message
@@ -164,7 +177,7 @@ const Settings: React.FC<SettingsProps> = ({ token, username }) => {
                 placeholder="Enter your vacation auto-response message"
               />
             </div>
-          )}
+          )*/}
 
           {/* Save Button */}
           <div className="flex justify-end">
