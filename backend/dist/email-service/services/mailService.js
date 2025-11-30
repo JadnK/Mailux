@@ -74,7 +74,6 @@ export const getInbox = async (username, password) => {
         return mailData;
     }));
     connection.end();
-    // Sort by date (newest first)
     return mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
 export const getSent = async (username, password) => {
@@ -86,7 +85,7 @@ export const getSent = async (username, password) => {
         const allParts = msg.parts.find((p) => p.which === "");
         const parsed = await simpleParser(allParts.body);
         return {
-            uid: msg.attributes.uid, // Add UID for deletion
+            uid: msg.attributes.uid,
             from: parsed.from?.text || "",
             to: parsed.to?.text || "",
             subject: parsed.subject || "",
@@ -96,7 +95,6 @@ export const getSent = async (username, password) => {
         };
     }));
     connection.end();
-    // Sort by date (newest first)
     return mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
 export const replyMail = async (mailData, username, password) => {
@@ -118,9 +116,7 @@ export const deleteMail = async (username, password, mailbox, mailUid) => {
     const connection = await imaps.connect(imapConfig);
     try {
         await connection.openBox(mailbox);
-        // Mark the message for deletion
         await connection.addFlags(mailUid, ['\\Deleted']);
-        // Expunge to permanently delete the message
         await connection.imap.expunge();
         return true;
     }

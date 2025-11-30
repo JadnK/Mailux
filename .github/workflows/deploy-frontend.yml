@@ -15,12 +15,7 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-          
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libpam0g-dev build-essential python3
-        
+      
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -64,7 +59,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: "frontend/dist/"
+        source: "frontend/dist"
         target: "/home/mailserver/frontend"
         strip_components: 1
         

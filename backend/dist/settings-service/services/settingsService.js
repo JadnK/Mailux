@@ -4,11 +4,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const CONFIG_PATH = path.join(__dirname, '../../../config.json');
-// Load config from file
 function loadConfig() {
     try {
         if (!fs.existsSync(CONFIG_PATH)) {
-            // Create default config if it doesn't exist
             const defaultConfig = {
                 globalSettings: {
                     defaultSignature: "Sent with Mailux",
@@ -24,7 +22,6 @@ function loadConfig() {
     }
     catch (error) {
         console.error('Error loading config:', error);
-        // Return default config on error
         return {
             globalSettings: {
                 defaultSignature: "Sent with Mailux",
@@ -34,7 +31,6 @@ function loadConfig() {
         };
     }
 }
-// Save config to file
 function saveConfig(config) {
     try {
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
@@ -44,7 +40,6 @@ function saveConfig(config) {
         throw error;
     }
 }
-// Default Settings
 let globalSettings = loadConfig().globalSettings;
 let userSettings = loadConfig().userSettings;
 const userOverrides = {};
@@ -61,7 +56,6 @@ export const updateGlobalSettings = (updates) => {
 export const getUserSettings = (username) => {
     const config = loadConfig();
     if (!config.userSettings[username]) {
-        // Create default user settings if they don't exist
         config.userSettings[username] = {
             name: username,
             signature: config.globalSettings.defaultSignature,
