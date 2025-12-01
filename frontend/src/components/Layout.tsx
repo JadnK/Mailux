@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Inbox from './Inbox';
 import Sent from './Sent';
+import type { InboxRef } from './Inbox';
+import type { SentRef } from './Sent';
 import SendMailForm from './SendMailForm';
 import Settings from './Settings';
 import UserManagementModal from './UserManagementModal';
@@ -16,6 +18,9 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ token, username, onLogout, onUserSwitch }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showUserManagement, setShowUserManagement] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const inboxRef = useRef<InboxRef>(null);
+  const sentRef = useRef<SentRef>(null);
   const location = useLocation();
 
   const navigation = [
@@ -26,6 +31,25 @@ const Layout: React.FC<LayoutProps> = ({ token, username, onLogout, onUserSwitch
   ];
 
   const isActive = (href: string) => location.pathname === href;
+
+  const showUpdateButton = location.pathname === '/' || location.pathname === '/sent';
+
+  const handleUpdate = async () => {
+    if (updating) return;
+    
+    setUpdating(true);
+    try {
+      if (location.pathname === '/' && inboxRef.current) {
+        await inboxRef.current.fetchMails();
+      } else if (location.pathname === '/sent' && sentRef.current) {
+        await sentRef.current.fetchMails();
+      }
+    } catch (error) {
+      console.error('Error updating:', error);
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 flex">
@@ -89,7 +113,21 @@ const Layout: React.FC<LayoutProps> = ({ token, username, onLogout, onUserSwitch
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <h1 className="text-xl font-bold text-purple-400">Mailux</h1>
+            <div className="flex items-center space-x-2">
+              <h1 className="text-xl font-bold text-purple-400">Mailux</h1>
+              {showUpdateButton && (
+                <button
+                  onClick={handleUpdate}
+                  disabled={updating}
+                  className="bg-gray-700 text-white px-3 py-1 rounded text-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{updating ? '...' : 'Update'}</span>
+                </button>
+              )}
+            </div>
             <button
               onClick={onLogout}
               className="text-sm text-gray-300 hover:text-purple-400"
@@ -101,10 +139,22 @@ const Layout: React.FC<LayoutProps> = ({ token, username, onLogout, onUserSwitch
 
         {/* Desktop Header */}
         <div className="hidden lg:flex items-center justify-between h-16 px-6 header">
-          <div className="flex items-center">
+          <div className="flex items-center space-x-4">
             <h1 className="text-xl font-semibold text-gray-300">
               {navigation.find(item => isActive(item.href))?.name || 'Mailux'}
             </h1>
+            {showUpdateButton && (
+              <button
+                onClick={handleUpdate}
+                disabled={updating}
+                className="bg-gray-700 text-white px-4 py-2 rounded text-sm hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>{updating ? 'Updating...' : 'Update'}</span>
+              </button>
+            )}
           </div>
           <div className="flex items-center space-x-4">
             <div 
@@ -133,8 +183,8 @@ const Layout: React.FC<LayoutProps> = ({ token, username, onLogout, onUserSwitch
         <main className="flex-1 overflow-auto">
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             <div className="px-4 py-6 sm:px-0">
-              {location.pathname === '/' && <Inbox token={token} />}
-              {location.pathname === '/sent' && <Sent token={token} />}
+              {location.pathname === '/' && <Inbox token={token} ref={inboxRef} />}
+              {location.pathname === '/sent' && <Sent token={token} ref={sentRef} />}
               {location.pathname === '/compose' && username && <SendMailForm token={token} username={username}/>}
               {location.pathname === '/settings' && username && <Settings token={token} username={username} />}
             </div>

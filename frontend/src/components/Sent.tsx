@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { mailAPI } from '../api/mail';
 import type { Mail } from '../types/mail';
 
@@ -6,28 +6,36 @@ interface SentProps {
   token: string;
 }
 
-const Sent: React.FC<SentProps> = ({ token }) => {
+export interface SentRef {
+  fetchMails: () => Promise<void>;
+}
+
+const Sent = forwardRef<SentRef, SentProps>(({ token }, ref) => {
   const [mails, setMails] = useState<Mail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  useEffect(() => {
-    const fetchMails = async () => {
-      try {
-        setLoading(true);
-        const data = await mailAPI.getSent();
-        setMails(data);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching sent mails:', err);
-        setError('Failed to load sent emails. Please check your connection and try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchMails = async () => {
+    try {
+      setLoading(true);
+      const data = await mailAPI.getSent();
+      setMails(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching sent mails:', err);
+      setError('Failed to load sent emails. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useImperativeHandle(ref, () => ({
+    fetchMails
+  }));
+
+  useEffect(() => {
     if (token) fetchMails();
   }, [token]);
 
@@ -73,8 +81,9 @@ const Sent: React.FC<SentProps> = ({ token }) => {
       <div className="bg-gray-850 border border-red-700 rounded-lg p-4">
         <p className="text-red-400">{error}</p>
         <button
-          onClick={() => window.location.reload()}
-          className="mt-2 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+          onClick={fetchMails}
+          disabled={loading}
+          className="mt-2 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:opacity-50"
         >
           Retry
         </button>
@@ -84,7 +93,12 @@ const Sent: React.FC<SentProps> = ({ token }) => {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-purple-400">Sent</h2>
+      <div className="flex items-center space-x-3">
+        <h2 className="text-2xl font-bold text-purple-400">Sent</h2>
+        <div className="text-sm text-gray-500">
+          {mails.length} {mails.length === 1 ? 'email' : 'emails'}
+        </div>
+      </div>
       {mails.length === 0 ? (
         <div className="bg-gray-850 rounded-lg p-8 text-center">
           <p className="text-gray-500">No sent emails</p>
@@ -140,6 +154,6 @@ const Sent: React.FC<SentProps> = ({ token }) => {
       )}
     </div>
   );
-};
+});
 
 export default Sent;

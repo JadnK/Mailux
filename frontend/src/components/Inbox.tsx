@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { mailAPI } from '../api/mail';
 import type { Mail } from '../types/mail';
 
@@ -6,7 +6,11 @@ interface InboxProps {
   token: string;
 }
 
-const Inbox: React.FC<InboxProps> = ({ token }) => {
+export interface InboxRef {
+  fetchMails: () => Promise<void>;
+}
+
+const Inbox = forwardRef<InboxRef, InboxProps>(({ token }, ref) => {
   const [mails, setMails] = useState<Mail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,21 +19,25 @@ const Inbox: React.FC<InboxProps> = ({ token }) => {
   const [replyContent, setReplyContent] = useState('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  useEffect(() => {
-    const fetchMails = async () => {
-      try {
-        setLoading(true);
-        const data = await mailAPI.getInbox();
-        setMails(data);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching inbox:', err);
-        setError('Failed to load inbox. Please check your connection and try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchMails = async () => {
+    try {
+      setLoading(true);
+      const data = await mailAPI.getInbox();
+      setMails(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching inbox:', err);
+      setError('Failed to load inbox. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useImperativeHandle(ref, () => ({
+    fetchMails
+  }));
+
+  useEffect(() => {
     if (token) fetchMails();
   }, [token]);
 
@@ -61,8 +69,7 @@ const Inbox: React.FC<InboxProps> = ({ token }) => {
       setExpandedIndex(null);
       
       // Refresh mails
-      const data = await mailAPI.getInbox();
-      setMails(data);
+      await fetchMails();
     } catch (err) {
       console.error('Error replying to mail:', err);
       setError('Failed to send reply. Please try again.');
@@ -100,8 +107,9 @@ const Inbox: React.FC<InboxProps> = ({ token }) => {
       <div className="bg-gray-850 border border-red-700 rounded-lg p-4">
         <p className="text-red-400">{error}</p>
         <button
-          onClick={() => window.location.reload()}
-          className="mt-2 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+          onClick={fetchMails}
+          disabled={loading}
+          className="mt-2 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:opacity-50"
         >
           Retry
         </button>
@@ -111,7 +119,12 @@ const Inbox: React.FC<InboxProps> = ({ token }) => {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-purple-400">Inbox</h2>
+      <div className="flex items-center space-x-3">
+        <h2 className="text-2xl font-bold text-purple-400">Inbox</h2>
+        <div className="text-sm text-gray-500">
+          {mails.length} {mails.length === 1 ? 'email' : 'emails'}
+        </div>
+      </div>
       {mails.length === 0 ? (
         <div className="bg-gray-850 rounded-lg p-8 text-center">
           <p className="text-gray-500">No emails in your inbox</p>
@@ -205,6 +218,6 @@ const Inbox: React.FC<InboxProps> = ({ token }) => {
       )}
     </div>
   );
-};
+});
 
 export default Inbox;

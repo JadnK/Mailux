@@ -53,29 +53,25 @@ jobs:
           # Stop existing backend
           echo "🛑 Stopping existing backend..."
           if screen -list | grep -q "mailux-backend"; then
-            screen -S "mailux-backend" -X quit
+            screen -XS "mailux-backend" quit
           fi
+
           
-          # Wait for process to stopp
           sleep 2
           
-          # Create directories
           echo "📁 Creating directories..."
           mkdir -p /home/mailserver/backend
           mkdir -p /home/mailserver/frontend
           mkdir -p /home/mailserver/logs
           
-          # Remove old files
           echo "🧹 Cleaning old files..."
           rm -rf /home/mailserver/backend/*
           rm -rf /home/mailserver/frontend/*
           
-          # Copy backend files
           echo "📋 Copying backend files..."
           mkdir -p /tmp/backend-deploy
           cd /tmp/backend-deploy
           
-          # Backend deployment commands will be executed via SCP
           
     - name: Copy Backend Files
       uses: appleboy/scp-action@v0.1.4
