@@ -111,10 +111,10 @@ jobs:
 
           # Docker Compose neu starten
           echo "⏹️ Stoppe Frontend-Container..."
-          docker-compose -f /home/mailserver/frontend/docker-compose.yml down
+          docker-compose -f /root/docker-compose.yml down
 
           echo "▶️ Starte Frontend-Container im Hintergrund..."
-          docker-compose -f /home/mailserver/frontend/docker-compose.yml up -d
+          docker-compose -f /root/docker-compose.yml up -d
 
           echo "✅ Frontend erfolgreich neu gestartet"
 
