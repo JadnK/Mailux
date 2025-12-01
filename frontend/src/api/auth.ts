@@ -1,6 +1,6 @@
 export const login = async (username: string, password: string) => {
   try {
-    const res = await fetch("http://jadenk.de:5000/api/login", {
+    const res = await fetch("http://host.docker.internal:5000/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
@@ -21,7 +21,7 @@ export const login = async (username: string, password: string) => {
 
 export const getUsers = async (token: string) => {
   try {
-    const res = await fetch("http://jadenk.de:5000/api/users", {
+    const res = await fetch("http://host.docker.internal:5000/api/users", {
       headers: { "Authorization": `Bearer ${token}` },
     });
 
@@ -38,7 +38,7 @@ export const getUsers = async (token: string) => {
 
 export const createUser = async (token: string, username: string, password: string) => {
   try {
-    const res = await fetch("http://jadenk.de:5000/api/users/create", {
+    const res = await fetch("http://host.docker.internal:5000/api/users/create", {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
