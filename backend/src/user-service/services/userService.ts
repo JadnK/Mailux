@@ -152,7 +152,7 @@ export default class UserService {
       const { execSync } = require('child_process');
       
       execSync(`sudo useradd -m -s /bin/bash "${username}"`, { stdio: 'pipe' });
-      execSync(`sudo bash -c "mkdir -p /home/${username}/Maildir/{cur,new,tmp}"`);
+      execSync(`sudo bash -c "mkdir -p /home/${username}/Maildir/{cur,new,tmp} /home/${username}/Maildir/.{Sent,Trash,Drafts}/{cur,new,tmp}"`, { stdio: 'pipe' });
       execSync(`sudo chown -R ${username}:${username} /home/${username}/Maildir`, { stdio: 'pipe' });
       execSync(`sudo chmod -R 700 /home/${username}/Maildir`, { stdio: 'pipe' });
       
