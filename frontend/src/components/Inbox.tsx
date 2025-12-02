@@ -1,6 +1,7 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { mailAPI } from '../api/mail';
 import type { Mail } from '../types/mail';
+import EmailViewer from './EmailViewer';
 
 interface InboxProps {
   token: string;
@@ -149,18 +150,20 @@ const Inbox = forwardRef<InboxRef, InboxProps>(({ token }, ref) => {
                       <span className="text-xs text-gray-500">{formatDateTime(mail.date)}</span>
                     </div>
                     <p className="text-sm font-semibold text-gray-200 mb-1">{mail.subject}</p>
-                    <p className="text-xs text-gray-400 line-clamp-1">
+                    {/* <p className="text-xs text-gray-400 line-clamp-1">
                       {mail.text.substring(0, 100)}{mail.text.length > 100 ? '...' : ''}
-                    </p>
+                    </p> */}
                   </div>
                 </div>
 
                 {/* Expanded Content */}
                 {isExpanded && (
                   <div className="mt-4 space-y-4">
-                    <div className="text-gray-400 whitespace-pre-line text-sm bg-gray-900 p-3 rounded">
-                      {mail.text}
-                    </div>
+                    <EmailViewer 
+                      html={mail.html} 
+                      text={mail.text}
+                      className="text-sm bg-gray-900 rounded"
+                    />
                     
                     {/* Action Buttons */}
                     <div className="flex space-x-2">
