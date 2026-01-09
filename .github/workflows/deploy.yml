@@ -48,6 +48,7 @@ jobs:
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
+        port: 2222
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           # Stop existing backend
@@ -78,6 +79,7 @@ jobs:
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
+        port: 2222
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         source: "backend/dist/,backend/node_modules/,backend/package.json"
         target: "/home/mailserver/backend"
@@ -89,6 +91,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 2222
         source: "frontend/dist/"
         target: "/home/mailserver/frontend"
         strip_components: 1
@@ -99,6 +102,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 2222
         script: |
           echo "🔧 Setting ownership and permissions for frontend..."
           sudo chown -R www-data:www-data /home/mailserver/frontend
@@ -120,6 +124,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 2222
         script: |
           echo "🔧 Preparing backend..."
 
@@ -145,6 +150,7 @@ jobs:
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
+        port: 2222
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           # Set permissions
@@ -166,7 +172,7 @@ jobs:
           if [ -f /home/mailserver/backend.pid ]; then
             PID=$(cat /home/mailserver/backend.pid)
             if ps -p $PID > /dev/null 2>&1; then
-              echo "✅ Backend is running with PID $PID"
+              echo "✅ Backend is ruport: 2222nning with PID $PID"
               echo "📊 Backend logs: tail -f /home/mailserver/logs/backend.log"
               echo "🖥️  Screen session: screen -r mailux-backend"
             else
