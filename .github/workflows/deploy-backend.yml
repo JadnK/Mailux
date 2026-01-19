@@ -50,6 +50,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 2222
         script: |
           # Stop existing backend
           echo "🛑 Stopping existing backend..."
@@ -69,6 +70,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 2222
         source: "backend/dist/,backend/node_modules/,backend/package.json"
         target: "/home/mailserver/backend"
         strip_components: 1
@@ -79,6 +81,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 2222
         script: |
           # Set permissions
           echo "🔧 Setting permissions..."
