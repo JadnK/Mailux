@@ -35,9 +35,20 @@ export const getInboxMails = async (req: Request, res: Response) => {
     const { username, password } = getUserCredentialsFromToken(req);
     const mails = await getInbox(username, password);
     res.json(mails);
-  } catch (err) {
-    res.status(500).json({ message: "Failed to get inbox mails", error: err });
-  }
+  } catch (err: any) {
+  console.error("getInboxMails error:", err);
+
+  res.status(500).json({
+    message: "Failed to get inbox mails",
+    error: {
+      name: err?.name,
+      message: err?.message,
+      code: err?.code,
+      stack: err?.stack,
+    },
+  });
+}
+
 };
 
 export const getSentMails = async (req: Request, res: Response) => {
