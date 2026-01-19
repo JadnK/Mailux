@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://jadenk.de:5000/api';
+const API_BASE_URL = 'https://mail.api.jadenk.de/api';
 
 export interface UserSettings {
   name: string;
