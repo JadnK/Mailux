@@ -59,3 +59,23 @@ export const createUser = async (token: string, username: string, password: stri
     throw err;
   }
 };
+
+export const deleteUser = async (token: string, username: string) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/users/${username}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to delete user");
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error("Delete user failed:", err);
+    throw err;
+  }
+};

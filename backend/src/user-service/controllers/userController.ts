@@ -52,7 +52,7 @@ export const deactivateUser = async (req: Request, res: Response) => {
     const username = req.params.username;
     if (!username) return res.status(400).json({ message: "username required" });
 
-    const ok = await userService.deactivateUser(username);
+    const ok = await userService.deleteUser(username);
     if (!ok) return res.status(404).json({ message: "User not found or already inactive" });
 
     return res.json({ message: "User deactivated" });

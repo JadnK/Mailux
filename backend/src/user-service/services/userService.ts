@@ -122,13 +122,20 @@ export default class UserService {
     return merged;
   }
 
-  public async deactivateUser(username: string): Promise<boolean> {
-    const existing = await this.getUser(username);
-    if (!existing) return false;
-    existing.canReceiveMail = false;
-    this.userSettingsStore.set(username, existing);
+public async deleteUser(username: string): Promise<boolean> {
+  try {
+    const { execSync } = require('child_process');
+
+    execSync(`sudo deluser -r "${username}"`, { stdio: 'pipe' });
+
+    this.userSettingsStore.delete(username);
+
     return true;
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return false;
   }
+}
 
   public async refreshCache(): Promise<UserSettings[]> {
     const sysUsers = await this.readSystemUsers();

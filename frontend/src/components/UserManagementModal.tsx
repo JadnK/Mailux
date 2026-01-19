@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUsers, createUser, login } from '../api/auth';
+import { getUsers, createUser, login, deleteUser } from '../api/auth';
 
 interface User {
   username: string;
@@ -31,6 +31,8 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [creatingUser, setCreatingUser] = useState(false);
   const [switchingUser, setSwitchingUser] = useState(false);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<string | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
 
   useEffect(() => {
     if (isOpen && currentToken) {
@@ -94,6 +96,21 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({
       console.error(err);
     } finally {
       setSwitchingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async (username: string) => {
+    setDeletingUser(true);
+    setError('');
+    try {
+      await deleteUser(currentToken, username);
+      setDeleteConfirmUser(null);
+      fetchUsers();
+    } catch (err) {
+      setError('Failed to delete user');
+      console.error(err);
+    } finally {
+      setDeletingUser(false);
     }
   };
 
@@ -163,14 +180,16 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({
           </form>
         ) : (
           <>
-            <div className="mb-4">
-              <button
-                onClick={() => setShowAddUser(true)}
-                className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
-              >
-                + Add Mail User
-              </button>
-            </div>
+            {currentUsername === 'info' && (
+              <div className="mb-4">
+                <button
+                  onClick={() => setShowAddUser(true)}
+                  className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
+                >
+                  + Add Mail User
+                </button>
+              </div>
+            )}
 
             {loading ? (
               <div className="text-center text-gray-300">Loading users...</div>
@@ -192,16 +211,26 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({
                           )}
                         </div>
                       </div>
-                      {user.username !== currentUsername && (
-                        <button
-                          onClick={() => setSelectedUser(user.username)}
-                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                        >
-                          Switch
-                        </button>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        {user.username !== currentUsername && (
+                          <button
+                            onClick={() => setSelectedUser(user.username)}
+                            className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                          >
+                            Switch
+                          </button>
+                        )}
+                        {currentUsername === 'info' && user.username !== 'info' && (
+                          <button
+                            onClick={() => setDeleteConfirmUser(user.username)}
+                            className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    
+
                     {selectedUser === user.username && (
                       <div className="mt-3 pt-3 border-t border-gray-600">
                         <div className="flex space-x-2">
@@ -218,6 +247,29 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({
                             className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700 disabled:opacity-50"
                           >
                             {switchingUser ? 'Switching...' : 'Switch'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {deleteConfirmUser === user.username && (
+                      <div className="mt-3 pt-3 border-t border-gray-600">
+                        <div className="text-white text-sm mb-2">
+                          Are you sure you want to delete {user.username}?
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleDeleteUser(user.username)}
+                            disabled={deletingUser}
+                            className="flex-1 bg-red-600 text-white py-1 px-3 rounded text-sm hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {deletingUser ? 'Deleting...' : 'Confirm Delete'}
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirmUser(null)}
+                            className="flex-1 bg-gray-600 text-white py-1 px-3 rounded text-sm hover:bg-gray-700"
+                          >
+                            Cancel
                           </button>
                         </div>
                       </div>
