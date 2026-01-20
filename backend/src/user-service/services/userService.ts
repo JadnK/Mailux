@@ -126,7 +126,7 @@ public async deleteUser(username: string): Promise<boolean> {
   try {
     const { execSync } = require('child_process');
 
-    execSync(`sudo deluser -r "${username}"`, { stdio: 'pipe' });
+    execSync(`sudo deluser --remove-home "${username}"`, { stdio: 'pipe' });
 
     this.userSettingsStore.delete(username);
 
