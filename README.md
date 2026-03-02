@@ -3,7 +3,7 @@
 **Mailux** ist ein simples Web-UI + Backend, um Mails auf einem **eigenen** Server zu verwalten (Postfächer anlegen/löschen, Inbox/Sent lesen, Mails senden, Ordner verwalten).  
 Als Mailserver setzt Mailux standardmäßig auf **Postfix** (SMTP) + **Dovecot** (IMAP/LMTP) und kann (optional, aber empfohlen) mit **SPF/DKIM/DMARC** betrieben werden. 
 
-> Diese README ist bewusst „step-by-step“ für Ubuntu/Debian geschrieben (ohne Mailcow/Mailu), passend zu einem klassischen Postfix+Dovecot Setup.
+> Diese README ist bewusst „step-by-step“ für Ubuntu/Debian geschrieben (ohne Mailcow/Mailu), passend zu einem klassischen Postfix+Dovecot Setu.
 
 ---
 
