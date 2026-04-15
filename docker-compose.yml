@@ -4,8 +4,17 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: mailux-backend
-    ports:
-      - "5000:5000"
+    network_mode: host
+    pid: host
+    privileged: true
+    volumes:
+      - /etc/passwd:/etc/passwd:ro
+      - /etc/shadow:/etc/shadow:ro
+      - /etc/group:/etc/group:ro
+      - /etc/pam.d:/etc/pam.d:ro
+      - /lib/x86_64-linux-gnu/security:/lib/x86_64-linux-gnu/security:ro
+      - /home:/home
+      - /var/mail:/var/mail
     env_file:
       - ./backend/.env
     restart: unless-stopped
