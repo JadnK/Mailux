@@ -101,23 +101,18 @@ export const getSent = async (username: string, password: string) => {
   const connection = await imaps.connect(imapConfig);
 
   try {
-    let openedBox = "";
+    console.log("Trying to open Sent mailbox for", username);
 
-    for (const boxName of ["Sent", "INBOX.Sent", ".Sent", "Sent Items", "Gesendet"]) {
-      try {
-        await connection.openBox(boxName);
-        openedBox = boxName;
-        console.log("Opened sent mailbox:", boxName);
-        break;
-      } catch (err) {
-        console.log(`Could not open mailbox "${boxName}"`, err);
-      }
-    }
+    try {
+      await connection.openBox("Sent");
+      console.log('Successfully opened "Sent"');
+    } catch (err) {
+      console.error('openBox("Sent") failed:', err);
 
-    if (!openedBox) {
       const boxes = await connection.getBoxes();
       console.dir(boxes, { depth: 10 });
-      throw new Error("No sent mailbox could be opened");
+
+      throw err;
     }
 
     const messages = await connection.search(["ALL"], {
