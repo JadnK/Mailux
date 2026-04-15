@@ -99,29 +99,55 @@ export const getInbox = async (username: string, password: string) => {
 export const getSent = async (username: string, password: string) => {
   const imapConfig = getImapConfig(username, password);
   const connection = await imaps.connect(imapConfig);
-  await connection.openBox("Sent");
 
-  const messages = await connection.search(["ALL"], { bodies: [""], struct: true });
+  try {
+    let openedBox = "";
 
-  const mails = await Promise.all(
-    messages.map(async (msg: any) => {
-      const allParts = msg.parts.find((p: any) => p.which === "");
-      const parsed = await simpleParser(allParts.body);
-      return {
-        uid: msg.attributes.uid, 
-        from: parsed.from?.text || "",
-        to: parsed.to?.text || "",
-        subject: parsed.subject || "",
-        date: parsed.date?.toString() || "",
-        text: parsed.text || "",
-        html: parsed.html || "",
-      };
-    })
-  );
+    for (const boxName of ["Sent", "INBOX.Sent", ".Sent", "Sent Items", "Gesendet"]) {
+      try {
+        await connection.openBox(boxName);
+        openedBox = boxName;
+        console.log("Opened sent mailbox:", boxName);
+        break;
+      } catch (err) {
+        console.log(`Could not open mailbox "${boxName}"`, err);
+      }
+    }
 
-  connection.end();
-  
-  return mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    if (!openedBox) {
+      const boxes = await connection.getBoxes();
+      console.dir(boxes, { depth: 10 });
+      throw new Error("No sent mailbox could be opened");
+    }
+
+    const messages = await connection.search(["ALL"], {
+      bodies: [""],
+      struct: true,
+    });
+
+    const mails = await Promise.all(
+      messages.map(async (msg: any) => {
+        const allParts = msg.parts.find((p: any) => p.which === "");
+        const parsed = await simpleParser(allParts.body);
+
+        return {
+          uid: msg.attributes.uid,
+          from: parsed.from?.text || "",
+          to: parsed.to?.text || "",
+          subject: parsed.subject || "",
+          date: parsed.date?.toString() || "",
+          text: parsed.text || "",
+          html: parsed.html || "",
+        };
+      })
+    );
+
+    return mails.sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  } finally {
+    await connection.end();
+  }
 };
 
 export const replyMail = async (mailData: MailData, username: string, password: string) => {
