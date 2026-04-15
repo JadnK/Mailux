@@ -9,13 +9,13 @@ services:
     privileged: true
     restart: unless-stopped
     volumes:
-      - /etc/passwd:/etc/passwd:ro
-      - /etc/shadow:/etc/shadow:ro
-      - /etc/group:/etc/group:ro
-      - /etc/gshadow:/etc/gshadow:ro
-      - /etc/nsswitch.conf:/etc/nsswitch.conf:ro
-      - ./backend/pam/mailux:/etc/pam.d/mailux:ro
-      - /home:/home:ro
+      - /etc/passwd:/etc/passwd
+      - /etc/shadow:/etc/shadow
+      - /etc/group:/etc/group
+      - /etc/gshadow:/etc/gshadow
+      - /etc/nsswitch.conf:/etc/nsswitch.conf
+      - ./backend/pam/mailux:/etc/pam.d/mailux
+      - /home:/home
       - /var/mail:/var/mail
     env_file:
       - ./backend/.env
