@@ -21,6 +21,17 @@ export interface UserSettings {
   canReceiveMail?: boolean;
 }
 
+type PamModule =
+  | {
+      authenticate?: (
+        username: string,
+        password: string,
+        cb: (err: Error | null) => void,
+        options?: { serviceName?: string }
+      ) => void;
+    }
+  | ((...args: any[]) => any);
+
 export default class UserService {
   private userSettingsStore: Map<string, UserSettings> = new Map();
   private cacheTimestamp: number | null = null;
@@ -33,12 +44,14 @@ export default class UserService {
   private parsePasswdLine(line: string): SysUser | null {
     const parts = line.split(":");
     if (parts.length < 7) return null;
+
     const username = parts[0];
     const uid = Number(parts[2]);
     const gid = Number(parts[3]);
     const comment = parts[4] || "";
     const home = parts[5] || "";
     const shell = parts[6] || "";
+
     return { username, uid, gid, comment, home, shell };
   }
 
@@ -53,14 +66,19 @@ export default class UserService {
 
   private async hasMaildir(home: string): Promise<boolean> {
     if (!home) return false;
+
     const candidates = [
       path.join(home, "Maildir"),
       path.join(home, "Maildir", "cur"),
       path.join(home, "mail", "Maildir"),
     ];
-    for (const c of candidates) {
-      if (await this.fileExists(c)) return true;
+
+    for (const candidate of candidates) {
+      if (await this.fileExists(candidate)) {
+        return true;
+      }
     }
+
     return false;
   }
 
@@ -68,37 +86,42 @@ export default class UserService {
     const passwdPath = "/etc/passwd";
     const content = await fs.readFile(passwdPath, "utf8");
     const lines = content.split("\n").filter(Boolean);
+
     const users: SysUser[] = [];
+
     for (const line of lines) {
-      const u = this.parsePasswdLine(line);
-      if (!u) continue;
-      if (u.uid >= (this.options?.minUid ?? 1000) && u.username !== "root") {
-        users.push(u);
+      const user = this.parsePasswdLine(line);
+      if (!user) continue;
+
+      if (user.uid >= (this.options?.minUid ?? 1000) && user.username !== "root") {
+        users.push(user);
       }
     }
+
     return users;
   }
 
-  /** --- Public API --- */
   public async getAllUsersWithMaildir(): Promise<UserSettings[]> {
     const sysUsers = await this.readSystemUsers();
     const results: UserSettings[] = [];
 
     await Promise.all(
-      sysUsers.map(async (su) => {
+      sysUsers.map(async (sysUser) => {
         try {
-          const has = await this.hasMaildir(su.home);
-          if (!has) return;
-          if (!this.userSettingsStore.has(su.username)) {
-            this.userSettingsStore.set(su.username, {
-              username: su.username,
+          const hasMaildir = await this.hasMaildir(sysUser.home);
+          if (!hasMaildir) return;
+
+          if (!this.userSettingsStore.has(sysUser.username)) {
+            this.userSettingsStore.set(sysUser.username, {
+              username: sysUser.username,
               canReceiveMail: true,
             });
           }
-          const settings = this.userSettingsStore.get(su.username)!;
+
+          const settings = this.userSettingsStore.get(sysUser.username)!;
           results.push(settings);
         } catch (err) {
-          console.warn(`UserService: error checking Maildir for ${su.username}`, err);
+          console.warn(`UserService: error checking Maildir for ${sysUser.username}`, err);
         }
       })
     );
@@ -111,31 +134,40 @@ export default class UserService {
     if (this.userSettingsStore.size === 0) {
       await this.getAllUsersWithMaildir();
     }
+
     return this.userSettingsStore.get(username) ?? null;
   }
 
-  public async updateUser(username: string, updates: Partial<UserSettings>): Promise<UserSettings | null> {
+  public async updateUser(
+    username: string,
+    updates: Partial<UserSettings>
+  ): Promise<UserSettings | null> {
     const existing = await this.getUser(username);
     if (!existing) return null;
-    const merged: UserSettings = { ...existing, ...updates, username: existing.username };
+
+    const merged: UserSettings = {
+      ...existing,
+      ...updates,
+      username: existing.username,
+    };
+
     this.userSettingsStore.set(username, merged);
     return merged;
   }
 
-public async deleteUser(username: string): Promise<boolean> {
-  try {
-    const { execSync } = require('child_process');
+  public async deleteUser(username: string): Promise<boolean> {
+    try {
+      const { execSync } = require("child_process");
 
-    execSync(`sudo deluser --remove-home "${username}"`, { stdio: 'pipe' });
+      execSync(`sudo deluser --remove-home "${username}"`, { stdio: "pipe" });
+      this.userSettingsStore.delete(username);
 
-    this.userSettingsStore.delete(username);
-
-    return true;
-  } catch (error) {
-    console.error('Error deleting user:', error);
-    return false;
+      return true;
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      return false;
+    }
   }
-}
 
   public async refreshCache(): Promise<UserSettings[]> {
     const sysUsers = await this.readSystemUsers();
@@ -156,84 +188,78 @@ public async deleteUser(username: string): Promise<boolean> {
 
   public async createUser(username: string, password: string): Promise<boolean> {
     try {
-      const { execSync } = require('child_process');
-      
-      execSync(`sudo useradd -m -s /usr/sbin/nologin "${username}"`, { stdio: 'pipe' });
-      execSync(`sudo bash -c "mkdir -p /home/${username}/Maildir/{cur,new,tmp} /home/${username}/Maildir/.{Sent,Trash,Drafts}/{cur,new,tmp}"`, { stdio: 'pipe' });
-      execSync(`sudo chown -R ${username}:${username} /home/${username}/Maildir`, { stdio: 'pipe' });
-      execSync(`sudo chmod -R 700 /home/${username}/Maildir`, { stdio: 'pipe' });
-      
-      execSync(`echo "${username}:${password}" | sudo chpasswd`, { stdio: 'pipe' });
-      
+      const { execSync } = require("child_process");
+
+      execSync(`sudo useradd -m -s /usr/sbin/nologin "${username}"`, { stdio: "pipe" });
+      execSync(
+        `sudo bash -c "mkdir -p /home/${username}/Maildir/{cur,new,tmp} /home/${username}/Maildir/.{Sent,Trash,Drafts}/{cur,new,tmp}"`,
+        { stdio: "pipe" }
+      );
+      execSync(`sudo chown -R ${username}:${username} /home/${username}/Maildir`, {
+        stdio: "pipe",
+      });
+      execSync(`sudo chmod -R 700 /home/${username}/Maildir`, { stdio: "pipe" });
+      execSync(`echo "${username}:${password}" | sudo chpasswd`, { stdio: "pipe" });
+
       this.userSettingsStore.set(username, {
         username,
         canReceiveMail: true,
       });
-      
+
       return true;
     } catch (error) {
-      console.error('Error creating user:', error);
+      console.error("Error creating user:", error);
       return false;
     }
   }
 }
-type PamModule = {
-  authenticate?: (username: string, password: string, cb: (err: Error | null) => void) => void;
-} | ((...args: any[]) => any);
 
-export const authenticateUser = (username: string, password: string, service = "login"): Promise<boolean> => {
+export const authenticateUser = (
+  username: string,
+  password: string,
+  service = "login"
+): Promise<boolean> => {
   return new Promise<boolean>((resolve, reject) => {
     let pam: PamModule | null = null;
+
     try {
       pam = require("authenticate-pam") as PamModule;
     } catch (e: any) {
-      console.error("authenticate-pam could not be required:", e && e.message);
+      console.error("authenticate-pam could not be required:", e?.message);
       return reject(new Error("authenticate-pam not available"));
     }
 
     const cb = (err: Error | null) => {
       if (err) {
-        console.error(`PAM auth failed (user=${username}, service=${service}):`, err.message || err);
+        console.error(
+          `PAM auth failed (user=${username}, service=${service}):`,
+          err.message || err
+        );
         return reject(err);
       }
+
       resolve(true);
     };
 
     try {
       if (pam && typeof (pam as any).authenticate === "function") {
-        try {
-          (pam as any).authenticate(username, password, cb);
-          return;
-        } catch (e) {
-          try {
-            (pam as any).authenticate(service, username, password, cb);
-            return;
-          } catch (e2) {
-            console.error("authenticate-pam.authenticate calls failed:", e2 && (e2 as Error).message);
-            return reject(e2);
-          }
-        }
+        (pam as any).authenticate(username, password, cb, {
+          serviceName: service,
+        });
+        return;
       }
 
       if (typeof pam === "function") {
-        try {
-          (pam as any)(username, password, cb);
-          return;
-        } catch (e) {
-          try {
-            (pam as any)(service, username, password, cb);
-            return;
-          } catch (e2) {
-            console.error("authenticate-pam direct-call attempts failed:", e2 && (e2 as Error).message);
-            return reject(e2);
-          }
-        }
+        (pam as any)(username, password, cb, {
+          serviceName: service,
+        });
+        return;
       }
 
       return reject(new Error("authenticate-pam: unexpected export shape"));
-    } catch (outerErr) {
-      console.error("authenticate-pam invocation threw:", outerErr && (outerErr as Error).message);
-      return reject(outerErr as Error);
+    } catch (err: any) {
+      console.error("authenticate-pam invocation threw:", err?.message);
+      return reject(err);
     }
   });
 };
