@@ -217,7 +217,7 @@ export default class UserService {
 export const authenticateUser = (
   username: string,
   password: string,
-  service = "login"
+  service = "mailux"
 ): Promise<boolean> => {
   return new Promise<boolean>((resolve, reject) => {
     let pam: PamModule | null = null;

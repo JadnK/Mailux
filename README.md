@@ -1,5 +1,7 @@
 # Mailux
 
+nsswitch.conf -> systemd bei passwd group und shadow raus
+
 **Mailux** ist ein simples Web-UI + Backend, um Mails auf einem **eigenen** Server zu verwalten (Postfächer anlegen/löschen, Inbox/Sent lesen, Mails senden, Ordner verwalten).  
 Als Mailserver setzt Mailux standardmäßig auf **Postfix** (SMTP) + **Dovecot** (IMAP/LMTP) und kann (optional, aber empfohlen) mit **SPF/DKIM/DMARC** betrieben werden. 
 
