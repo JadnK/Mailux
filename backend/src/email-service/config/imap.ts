@@ -3,9 +3,10 @@ dotenv.config();
 
 export const getImapConfig = (username: string, password: string) => ({
   imap: {
-    user: username.includes("@")
-      ? username
-      : `${username}@${process.env.MAIL_DOMAIN || "jadenk.de"}`,
+    user: username,
+    // user: username.includes("@")
+    //   ? username
+    //   : `${username}@${process.env.MAIL_DOMAIN || "jadenk.de"}`,
     password: password,
     host: process.env.MAIL_HOST_IMAP,
     port: Number(process.env.MAIL_IMAP_PORT) || 993,

@@ -8,9 +8,10 @@ export const getMailTransporter = (username: string, password: string) => nodema
   port: process.env.MAIL_PORT,      // SMTP Port -> default 587
   secure: false,                    // auf tr54ue setzn wenn TLS/SSL
   auth: {
-    user: username.includes("@")
-      ? username
-      : `${username}@${process.env.MAIL_DOMAIN || "jadenk.de"}`,
+    user: username,
+    // user: username.includes("@")
+    //   ? username
+    //   : `${username}@${process.env.MAIL_DOMAIN || "jadenk.de"}`,
     pass: password,
   },
 });
