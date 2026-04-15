@@ -12,6 +12,10 @@ services:
       - /etc/shadow:/etc/shadow:ro
       - /etc/group:/etc/group:ro
       - /etc/pam.d:/etc/pam.d:ro
+      - /etc/nsswitch.conf:/etc/nsswitch.conf:ro
+      - /etc/login.defs:/etc/login.defs:ro
+      - /etc/shells:/etc/shells:ro
+      - /etc/security:/etc/security:ro
       - /lib/x86_64-linux-gnu/security:/lib/x86_64-linux-gnu/security:ro
       - /home:/home
       - /var/mail:/var/mail
