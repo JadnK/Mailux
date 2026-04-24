@@ -1,24 +1,24 @@
 services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: mailux-backend
-    network_mode: host
-    pid: host
-    privileged: true
-    restart: unless-stopped
-    volumes:
-      - /etc/passwd:/etc/passwd
-      - /etc/shadow:/etc/shadow
-      - /etc/group:/etc/group
-      - /etc/gshadow:/etc/gshadow
-      - /etc/nsswitch.conf:/etc/nsswitch.conf
-      - ./backend/pam/mailux:/etc/pam.d/mailux
-      - /home:/home
-      - /var/mail:/var/mail
-    env_file:
-      - ./backend/.env
+  #backend:
+  #  build:
+  #    context: ./backend
+  #    dockerfile: Dockerfile
+  #  container_name: mailux-backend
+  #  network_mode: host
+  #  pid: host
+  #  privileged: true
+  #  restart: unless-stopped
+  #  volumes:
+  #    - /etc/passwd:/etc/passwd
+  #    - /etc/shadow:/etc/shadow
+  #    - /etc/group:/etc/group
+  #    - /etc/gshadow:/etc/gshadow
+  #    - /etc/nsswitch.conf:/etc/nsswitch.conf
+  #    - ./backend/pam/mailux:/etc/pam.d/mailux
+  #    - /home:/home
+  #    - /var/mail:/var/mail
+  #  env_file:
+  #    - ./backend/.env
 
   frontend:
     build:
@@ -27,8 +27,8 @@ services:
     container_name: mailux-frontend
     ports:
       - "5173:5173"
-    environment:
-      - VITE_API_URL=http://backend:5000
-    depends_on:
-      - backend
+   # environment:
+   #   - VITE_API_URL=http://backend:5000
+   # depends_on:
+   #   - backend
     restart: unless-stopped

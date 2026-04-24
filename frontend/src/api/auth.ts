@@ -1,17 +1,24 @@
-const API_BASE_URL = 'https://mail.api.jadenk.de/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_KEY = import.meta.env.VITE_API_KEY;
+
+const getHeaders = (token?: string): HeadersInit => ({
+  "Content-Type": "application/json",
+  "x-api-key": API_KEY,
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+});
 
 export const login = async (username: string, password: string) => {
   try {
     const res = await fetch(`${API_BASE_URL}/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getHeaders(),
       body: JSON.stringify({ username, password }),
     });
 
     const data = await res.json();
 
-    if (!data.username) {
-      throw new Error("Invalid credentials");
+    if (!res.ok || !data.username) {
+      throw new Error(data.message || "Invalid credentials");
     }
 
     return data;
@@ -24,7 +31,7 @@ export const login = async (username: string, password: string) => {
 export const getUsers = async (token: string) => {
   try {
     const res = await fetch(`${API_BASE_URL}/users`, {
-      headers: { "Authorization": `Bearer ${token}` },
+      headers: getHeaders(token),
     });
 
     if (!res.ok) {
@@ -38,14 +45,15 @@ export const getUsers = async (token: string) => {
   }
 };
 
-export const createUser = async (token: string, username: string, password: string) => {
+export const createUser = async (
+  token: string,
+  username: string,
+  password: string
+) => {
   try {
     const res = await fetch(`${API_BASE_URL}/users/create`, {
       method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
+      headers: getHeaders(token),
       body: JSON.stringify({ username, password }),
     });
 
@@ -64,9 +72,7 @@ export const deleteUser = async (token: string, username: string) => {
   try {
     const res = await fetch(`${API_BASE_URL}/users/${username}`, {
       method: "DELETE",
-      headers: {
-        "Authorization": `Bearer ${token}`
-      },
+      headers: getHeaders(token),
     });
 
     if (!res.ok) {
