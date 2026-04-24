@@ -1,11 +1,25 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const API_KEY = import.meta.env.VITE_API_KEY;
 
-const getHeaders = (token?: string): HeadersInit => ({
-  "Content-Type": "application/json",
-  "x-api-key": API_KEY,
-  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-});
+const getHeaders = (token?: string): HeadersInit => {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (API_KEY) {
+    headers["x-api-key"] = API_KEY;
+  } else {
+    console.error("VITE_API_KEY is missing");
+  }
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  console.log("headers", headers);
+
+  return headers;
+};
 
 export const login = async (username: string, password: string) => {
   try {
