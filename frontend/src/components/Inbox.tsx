@@ -1,220 +1,175 @@
-import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import { mailAPI } from '../api/mail';
 import type { Mail } from '../types/mail';
 import EmailViewer from './EmailViewer';
 
-interface InboxProps {
-  token: string;
-}
+interface InboxProps { token: string; }
+export interface InboxRef { fetchMails: () => Promise<void>; }
 
-export interface InboxRef {
-  fetchMails: () => Promise<void>;
-}
+type Status = 'loading' | 'ready' | 'error';
+
+const initials = (value: string) =>
+  (value || '?').replace(/<.*?>/g, '').trim().slice(0, 2).toUpperCase() || '?';
+
+const formatDateTime = (dateString: string) => {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return dateString || 'Unknown date';
+  return date.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+const preview = (mail: Mail) =>
+  (mail.text || mail.html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 const Inbox = forwardRef<InboxRef, InboxProps>(({ token }, ref) => {
   const [mails, setMails] = useState<Mail[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<Status>('loading');
   const [error, setError] = useState<string | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyContent, setReplyContent] = useState('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [query, setQuery] = useState('');
 
   const fetchMails = async () => {
     try {
-      setLoading(true);
+      setStatus('loading');
       const data = await mailAPI.getInbox();
       setMails(data);
       setError(null);
+      setStatus('ready');
     } catch (err) {
       console.error('Error fetching inbox:', err);
-      setError('Failed to load inbox. Please check your connection and try again.');
-    } finally {
-      setLoading(false);
+      setError('Inbox konnte nicht geladen werden. Bitte Verbindung prüfen und erneut versuchen.');
+      setStatus('error');
     }
   };
 
-  useImperativeHandle(ref, () => ({
-    fetchMails
-  }));
+  useImperativeHandle(ref, () => ({ fetchMails }));
+  useEffect(() => { if (token) fetchMails(); }, [token]);
 
-  useEffect(() => {
-    if (token) fetchMails();
-  }, [token]);
-
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const filteredMails = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return mails;
+    return mails.filter((mail) => [mail.from, mail.subject, mail.text].some((value) => value?.toLowerCase().includes(needle)));
+  }, [mails, query]);
 
   const handleReply = async (mail: Mail) => {
     if (!replyContent.trim()) return;
-
     try {
-      const replyData = {
+      await mailAPI.replyMail({
         to: mail.from,
-        subject: `Re: ${mail.subject}`,
+        subject: mail.subject?.startsWith('Re:') ? mail.subject : `Re: ${mail.subject}`,
         text: replyContent,
-        html: replyContent.replace(/\n/g, '<br>')
-      };
-
-      await mailAPI.replyMail(replyData);
+        html: replyContent.replace(/\n/g, '<br />'),
+      });
       setReplyingTo(null);
       setReplyContent('');
       setExpandedIndex(null);
-      
-      // Refresh mails
       await fetchMails();
     } catch (err) {
       console.error('Error replying to mail:', err);
-      setError('Failed to send reply. Please try again.');
+      setError('Antwort konnte nicht gesendet werden.');
+      setStatus('error');
     }
   };
 
   const handleDelete = async (mail: Mail) => {
     if (!mail.uid) return;
-
     try {
       setDeletingId(mail.uid);
       await mailAPI.deleteMail('INBOX', mail.uid);
-      
-      // Remove from local state
-      setMails(prev => prev.filter(m => m.uid !== mail.uid));
+      setMails((prev) => prev.filter((m) => m.uid !== mail.uid));
       setExpandedIndex(null);
     } catch (err) {
       console.error('Error deleting mail:', err);
-      setError('Failed to delete mail. Please try again.');
+      setError('Mail konnte nicht gelöscht werden.');
+      setStatus('error');
     } finally {
       setDeletingId(null);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
-      </div>
-    );
+  if (status === 'loading') {
+    return <div className="flex h-80 items-center justify-center"><div className="mx-spinner" /></div>;
   }
 
-  if (error) {
+  if (status === 'error') {
     return (
-      <div className="bg-gray-850 border border-red-700 rounded-lg p-4">
-        <p className="text-red-400">{error}</p>
-        <button
-          onClick={fetchMails}
-          disabled={loading}
-          className="mt-2 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:opacity-50"
-        >
-          Retry
-        </button>
+      <div className="mx-card p-6">
+        <p className="mx-alert-error">{error}</p>
+        <button onClick={fetchMails} className="mx-btn-primary mt-4">Retry</button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center space-x-3">
-        <h2 className="text-2xl font-bold text-purple-400">Inbox</h2>
-        <div className="text-sm text-gray-500">
-          {mails.length} {mails.length === 1 ? 'email' : 'emails'}
+    <div className="space-y-6">
+      <div className="mx-card p-5 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <span className="mx-pill">Inbox · {mails.length} Mails</span>
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-white">Eingang</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Schneller Überblick, fokussierte Mail-Karten und eine deutlich hochwertigere Vorschau.</p>
+          </div>
+          <div className="w-full lg:w-80">
+            <label className="sr-only" htmlFor="mail-search">Search</label>
+            <input id="mail-search" className="mx-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search sender, subject, content..." />
+          </div>
         </div>
       </div>
-      {mails.length === 0 ? (
-        <div className="bg-gray-850 rounded-lg p-8 text-center">
-          <p className="text-gray-500">No emails in your inbox</p>
+
+      {filteredMails.length === 0 ? (
+        <div className="mx-card p-12 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-white/[0.06] text-3xl">✉️</div>
+          <h3 className="text-xl font-bold text-white">Keine Mails gefunden</h3>
+          <p className="mt-2 text-sm text-slate-400">{query ? 'Passe deine Suche an.' : 'Dein Posteingang ist aktuell leer.'}</p>
         </div>
       ) : (
-        <div className="bg-gray-850 shadow rounded-lg overflow-hidden divide-y divide-gray-700">
-          {mails.map((mail, index) => {
-            const isExpanded = index === expandedIndex;
-            const isReplying = replyingTo === index;
-            
+        <div className="grid gap-4">
+          {filteredMails.map((mail, index) => {
+            const sourceIndex = mails.indexOf(mail);
+            const isExpanded = sourceIndex === expandedIndex;
+            const isReplying = replyingTo === sourceIndex;
+            const mailPreview = preview(mail);
+
             return (
-              <div
-                key={index}
-                className="p-4 hover:bg-gray-800 transition-colors duration-150"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 cursor-pointer" onClick={() =>
-                    setExpandedIndex(isExpanded ? null : index)
-                  }>
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-sm font-medium text-purple-300">{mail.from}</h3>
-                      <span className="text-xs text-gray-500">{formatDateTime(mail.date)}</span>
+              <article key={mail.uid ?? `${mail.from}-${mail.date}-${index}`} className={`mx-card overflow-hidden transition ${isExpanded ? 'ring-1 ring-violet-300/40' : 'hover:border-white/20'}`}>
+                <button type="button" className="grid w-full gap-4 p-5 text-left sm:grid-cols-[auto_1fr_auto] sm:items-center" onClick={() => setExpandedIndex(isExpanded ? null : sourceIndex)}>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/90 to-cyan-400/80 text-sm font-black text-white shadow-lg shadow-violet-950/30">{initials(mail.from)}</div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-sm font-bold text-slate-100">{mail.from}</h3>
+                      <span className="mx-pill !px-2 !py-0.5">received</span>
                     </div>
-                    <p className="text-sm font-semibold text-gray-200 mb-1">{mail.subject}</p>
-                    {/* <p className="text-xs text-gray-400 line-clamp-1">
-                      {mail.text.substring(0, 100)}{mail.text.length > 100 ? '...' : ''}
-                    </p> */}
+                    <p className="mt-1 truncate text-base font-semibold text-white">{mail.subject || '(No subject)'}</p>
+                    <p className="mt-1 line-clamp-1 text-sm text-slate-400">{mailPreview || 'No preview available'}</p>
                   </div>
-                </div>
+                  <div className="text-left sm:text-right">
+                    <p className="text-xs font-medium text-slate-400">{formatDateTime(mail.date)}</p>
+                    <p className="mt-2 text-xs text-cyan-200">{isExpanded ? 'Hide preview ↑' : 'Open preview ↓'}</p>
+                  </div>
+                </button>
 
-                {/* Expanded Content */}
                 {isExpanded && (
-                  <div className="mt-4 space-y-4">
-                    <EmailViewer 
-                      html={mail.html} 
-                      text={mail.text}
-                      className="text-sm bg-gray-900 rounded"
-                    />
-                    
-                    {/* Action Buttons */}
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => setReplyingTo(isReplying ? null : index)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                      >
-                        {isReplying ? 'Cancel' : 'Reply'}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(mail)}
-                        disabled={deletingId === mail.uid}
-                        className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 disabled:opacity-50"
-                      >
-                        {deletingId === mail.uid ? 'Deleting...' : 'Delete'}
-                      </button>
+                  <div className="border-t border-white/10 p-5">
+                    <EmailViewer html={mail.html} text={mail.text} />
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <button type="button" onClick={() => setReplyingTo(isReplying ? null : sourceIndex)} className="mx-btn-secondary">{isReplying ? 'Cancel reply' : 'Reply'}</button>
+                      <button type="button" onClick={() => handleDelete(mail)} disabled={deletingId === mail.uid} className="mx-btn-danger">{deletingId === mail.uid ? 'Deleting...' : 'Delete'}</button>
                     </div>
-
-                    {/* Reply Form */}
                     {isReplying && (
-                      <div className="bg-gray-900 p-4 rounded space-y-3">
-                        <textarea
-                          value={replyContent}
-                          onChange={(e) => setReplyContent(e.target.value)}
-                          placeholder="Type your reply..."
-                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                          rows={4}
-                        />
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleReply(mail)}
-                            disabled={!replyContent.trim()}
-                            className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:opacity-50"
-                          >
-                            Send Reply
-                          </button>
-                          <button
-                            onClick={() => {
-                              setReplyingTo(null);
-                              setReplyContent('');
-                            }}
-                            className="bg-gray-600 text-white px-4 py-2 rounded text-sm hover:bg-gray-700"
-                          >
-                            Cancel
-                          </button>
+                      <div className="mt-5 mx-card-soft p-4">
+                        <label className="mx-label">Antwort an {mail.from}</label>
+                        <textarea value={replyContent} onChange={(e) => setReplyContent(e.target.value)} placeholder="Schreibe deine Antwort..." className="mx-textarea" rows={5} />
+                        <div className="mt-4 flex flex-wrap justify-end gap-3">
+                          <button type="button" onClick={() => { setReplyingTo(null); setReplyContent(''); }} className="mx-btn-secondary">Cancel</button>
+                          <button type="button" onClick={() => handleReply(mail)} disabled={!replyContent.trim()} className="mx-btn-primary">Send Reply</button>
                         </div>
                       </div>
                     )}
                   </div>
                 )}
-              </div>
+              </article>
             );
           })}
         </div>
