@@ -6,6 +6,8 @@ const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
+let isLoggingOut = false;
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
 
@@ -18,6 +20,25 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (
+      error.response?.status === 401 &&
+      !isLoggingOut &&
+      window.location.pathname !== '/login'
+    ) {
+      isLoggingOut = true;
+
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+
+      window.location.href = '/';
+    }
+
+    return Promise.reject(error);
+  }
+);
 export const authAPI = {
   login: async (username: string, password: string) => {
     const response = await api.post('/login', { username, password });
