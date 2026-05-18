@@ -191,15 +191,40 @@ export default class UserService {
       const { execSync } = require("child_process");
 
       execSync(`sudo useradd -m -s /usr/sbin/nologin "${username}"`, { stdio: "pipe" });
-      execSync(
-        `sudo bash -c "mkdir -p /home/${username}/Maildir/{cur,new,tmp} /home/${username}/Maildir/.{Sent,Trash,Drafts}/{cur,new,tmp}"`,
-        { stdio: "pipe" }
-      );
-      execSync(`sudo chown -R ${username}:${username} /home/${username}/Maildir`, {
+
+      const folders = [
+        `/home/${username}/Maildir/cur`,
+        `/home/${username}/Maildir/new`,
+        `/home/${username}/Maildir/tmp`,
+
+        `/home/${username}/Maildir/.Sent/cur`,
+        `/home/${username}/Maildir/.Sent/new`,
+        `/home/${username}/Maildir/.Sent/tmp`,
+
+        `/home/${username}/Maildir/.Trash/cur`,
+        `/home/${username}/Maildir/.Trash/new`,
+        `/home/${username}/Maildir/.Trash/tmp`,
+
+        `/home/${username}/Maildir/.Drafts/cur`,
+        `/home/${username}/Maildir/.Drafts/new`,
+        `/home/${username}/Maildir/.Drafts/tmp`,
+      ];
+
+      for (const folder of folders) {
+        execSync(`sudo mkdir -p "${folder}"`, { stdio: "pipe" });
+      }
+
+      execSync(`sudo chown -R "${username}:${username}" "/home/${username}/Maildir"`, {
         stdio: "pipe",
       });
-      execSync(`sudo chmod -R 700 /home/${username}/Maildir`, { stdio: "pipe" });
-      execSync(`echo "${username}:${password}" | sudo chpasswd`, { stdio: "pipe" });
+
+      execSync(`sudo chmod -R 700 "/home/${username}/Maildir"`, {
+        stdio: "pipe",
+      });
+
+      execSync(`echo "${username}:${password}" | sudo chpasswd`, {
+        stdio: "pipe",
+      });
 
       this.userSettingsStore.set(username, {
         username,
