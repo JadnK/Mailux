@@ -1,7 +1,9 @@
 import type { ComposePayload, Mail, Session } from "../types/mail";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api";
-const x_API_KEY = import.meta.env.VITE_API_KEY;
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api";
+
+const API_KEY = import.meta.env.VITE_API_KEY;
 
 async function request<T>(
   path: string,
@@ -12,6 +14,7 @@ async function request<T>(
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(API_KEY ? { "x-api-key": API_KEY } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers ?? {})
     }
@@ -66,11 +69,18 @@ export async function getCustomFolders(session: Session): Promise<string[]> {
   );
 }
 
-export async function sendMail(session: Session, payload: ComposePayload): Promise<void> {
-  await request("/mail/send", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  }, session.token);
+export async function sendMail(
+  session: Session,
+  payload: ComposePayload
+): Promise<void> {
+  await request(
+    "/mail/send",
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    session.token
+  );
 }
 
 export async function deleteMail(
@@ -78,10 +88,14 @@ export async function deleteMail(
   mailbox: string,
   uid: number | string
 ): Promise<void> {
-  await request("/mail/delete", {
-    method: "DELETE",
-    body: JSON.stringify({ mailbox, uid: Number(uid) })
-  }, session.token);
+  await request(
+    "/mail/delete",
+    {
+      method: "DELETE",
+      body: JSON.stringify({ mailbox, uid: Number(uid) })
+    },
+    session.token
+  );
 }
 
 export function isRootUser(username: string): boolean {
