@@ -481,3 +481,10 @@ Empfohlen: Reverse Proxy (z.B. Nginx Proxy Manager):
 - [ ] SPF/DKIM/DMARC korrekt gesetzt
 - [ ] PTR (Reverse DNS) setzen lassen
 - [ ] Regelmäßige Updates (`unattended-upgrades`)
+
+
+
+sudo mkdir -p /mailuser
+sudo chmod 755 /mailuser
+
+ORDENR ERSTELLEn

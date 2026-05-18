@@ -186,57 +186,65 @@ export default class UserService {
     return Array.from(this.userSettingsStore.values());
   }
 
-  public async createUser(username: string, password: string): Promise<boolean> {
-    try {
-      const { execSync } = require("child_process");
+public async createUser(username: string, password: string): Promise<boolean> {
+  try {
+    const { execSync } = require("child_process");
 
-      execSync(`sudo useradd -m -s /usr/sbin/nologin "${username}"`, { stdio: "pipe" });
+    const mailBase = "/mailuser";
+    const userHome = `${mailBase}/${username}`;
+    const mailDir = `${userHome}/Maildir`;
 
-      const folders = [
-        `/home/${username}/Maildir/cur`,
-        `/home/${username}/Maildir/new`,
-        `/home/${username}/Maildir/tmp`,
+    execSync(`sudo mkdir -p "${mailBase}"`, { stdio: "pipe" });
 
-        `/home/${username}/Maildir/.Sent/cur`,
-        `/home/${username}/Maildir/.Sent/new`,
-        `/home/${username}/Maildir/.Sent/tmp`,
+    execSync(`sudo useradd -m -d "${userHome}" -s /usr/sbin/nologin "${username}"`, {
+      stdio: "pipe",
+    });
 
-        `/home/${username}/Maildir/.Trash/cur`,
-        `/home/${username}/Maildir/.Trash/new`,
-        `/home/${username}/Maildir/.Trash/tmp`,
+    const folders = [
+      `${mailDir}/cur`,
+      `${mailDir}/new`,
+      `${mailDir}/tmp`,
 
-        `/home/${username}/Maildir/.Drafts/cur`,
-        `/home/${username}/Maildir/.Drafts/new`,
-        `/home/${username}/Maildir/.Drafts/tmp`,
-      ];
+      `${mailDir}/.Sent/cur`,
+      `${mailDir}/.Sent/new`,
+      `${mailDir}/.Sent/tmp`,
 
-      for (const folder of folders) {
-        execSync(`sudo mkdir -p "${folder}"`, { stdio: "pipe" });
-      }
+      `${mailDir}/.Trash/cur`,
+      `${mailDir}/.Trash/new`,
+      `${mailDir}/.Trash/tmp`,
 
-      execSync(`sudo chown -R "${username}:${username}" "/home/${username}/Maildir"`, {
-        stdio: "pipe",
-      });
+      `${mailDir}/.Drafts/cur`,
+      `${mailDir}/.Drafts/new`,
+      `${mailDir}/.Drafts/tmp`,
+    ];
 
-      execSync(`sudo chmod -R 700 "/home/${username}/Maildir"`, {
-        stdio: "pipe",
-      });
-
-      execSync(`echo "${username}:${password}" | sudo chpasswd`, {
-        stdio: "pipe",
-      });
-
-      this.userSettingsStore.set(username, {
-        username,
-        canReceiveMail: true,
-      });
-
-      return true;
-    } catch (error) {
-      console.error("Error creating user:", error);
-      return false;
+    for (const folder of folders) {
+      execSync(`sudo mkdir -p "${folder}"`, { stdio: "pipe" });
     }
+
+    execSync(`sudo chown -R "${username}:${username}" "${mailDir}"`, {
+      stdio: "pipe",
+    });
+
+    execSync(`sudo chmod -R 700 "${mailDir}"`, {
+      stdio: "pipe",
+    });
+
+    execSync(`echo "${username}:${password}" | sudo chpasswd`, {
+      stdio: "pipe",
+    });
+
+    this.userSettingsStore.set(username, {
+      username,
+      canReceiveMail: true,
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Error creating user:", error);
+    return false;
   }
+}
 }
 
 export const authenticateUser = (
