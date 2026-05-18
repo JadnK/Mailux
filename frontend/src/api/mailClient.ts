@@ -1,6 +1,7 @@
 import type { ComposePayload, Mail, Session } from "../types/mail";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:5000/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api";
+const x_API_KEY = import.meta.env.VITE_API_KEY;
 
 async function request<T>(
   path: string,
