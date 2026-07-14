@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { UserManagementPanel } from "./UserManagementPanel";
 import {
   deleteMail,
   getCustomFolders,
@@ -50,6 +51,7 @@ function plainPreview(mail?: Mail): string {
 
 export function MailShell({ session, onLogout }: MailShellProps) {
   const [activeFolder, setActiveFolder] = useState<FolderItem>(SYSTEM_FOLDERS[0]);
+  const [activeView, setActiveView] = useState<"mail" | "users">("mail");
   const [customFolders, setCustomFolders] = useState<FolderItem[]>([]);
   const [mails, setMails] = useState<Mail[]>([]);
   const [selectedUid, setSelectedUid] = useState<number | string | null>(null);
@@ -139,6 +141,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   }, []);
 
   async function switchFolder(folder: FolderItem) {
+    setActiveView("mail");
     setActiveFolder(folder);
     await loadFolder(folder);
   }
@@ -201,7 +204,14 @@ export function MailShell({ session, onLogout }: MailShellProps) {
         <button className="compose-button" onClick={() => setComposeOpen(true)}>
           Neue Nachricht
         </button>
-
+        {canHardDelete && (
+  <button
+    className={`compose-button ${activeView === "users" ? "active" : ""}`}
+    onClick={() => setActiveView("users")}
+  >
+    User verwalten
+  </button>
+)}
         <nav className="folder-list" aria-label="Mail folders">
           {folders.map((folder) => (
             <button
@@ -226,6 +236,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
         </div>
       </aside>
 
+      {activeView === "mail" && (
       <section className="message-list-panel">
         <header className="panel-header">
           <div>
@@ -274,6 +285,10 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           ))}
         </div>
       </section>
+      )}
+      {activeView === "users" ? (
+  <UserManagementPanel session={session} />
+) : (
 
       <main className="reader-panel">
         {selectedMail ? (
@@ -333,7 +348,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           </div>
         )}
       </main>
-
+      )}
       {composeOpen && (
         <div className="compose-overlay" role="dialog" aria-modal="true">
           <form className="compose-window" onSubmit={handleSend}>

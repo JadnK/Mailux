@@ -38,3 +38,4 @@ export type FolderItem = {
   system?: boolean;
   destructive?: boolean;
 };
+

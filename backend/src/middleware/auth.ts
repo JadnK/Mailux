@@ -4,7 +4,6 @@ import jwt from "jsonwebtoken";
 export interface AuthRequest extends Request {
   user?: {
     username: string;
-    password?: string;
   };
 }
 
@@ -25,7 +24,7 @@ export const requireAuth = (
     const decoded = jwt.verify(
       token,
       process.env.JWT_SECRET || "secretkey"
-    ) as { username: string; password?: string };
+    ) as { username: string };
 
     req.user = decoded;
     next();
@@ -36,4 +35,16 @@ export const requireAuth = (
 
     return res.status(401).json({ message: "Invalid token" });
   }
+};
+
+export const requireRoot = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  if (req.user?.username !== "root") {
+    return res.status(403).json({ message: "Root access required" });
+  }
+
+  next();
 };

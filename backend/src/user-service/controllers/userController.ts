@@ -70,6 +70,18 @@ export const createUser = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Username and password required" });
     }
 
+    const usernameRegex = /^[a-z_][a-z0-9_-]{0,31}$/;
+
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({ message: "Invalid username" });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters",
+      });
+    }
+
     const success = await userService.createUser(username, password);
     if (!success) {
       return res.status(500).json({ message: "Failed to create user" });

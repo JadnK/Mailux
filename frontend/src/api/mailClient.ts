@@ -101,3 +101,43 @@ export async function deleteMail(
 export function isRootUser(username: string): boolean {
   return username.trim().toLowerCase() === "root";
 }
+
+export type ManagedUser = {
+  username: string;
+  name?: string;
+  profilePicture?: string;
+  signature?: string;
+  canReceiveMail?: boolean;
+};
+
+export async function getUsers(session: Session): Promise<ManagedUser[]> {
+  return request<ManagedUser[]>("/users", {}, session.token);
+}
+
+export async function createUser(
+  session: Session,
+  username: string,
+  password: string
+): Promise<void> {
+  await request(
+    "/users/create",
+    {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    },
+    session.token
+  );
+}
+
+export async function deleteUser(
+  session: Session,
+  username: string
+): Promise<void> {
+  await request(
+    `/users/${encodeURIComponent(username)}`,
+    {
+      method: "DELETE",
+    },
+    session.token
+  );
+}
