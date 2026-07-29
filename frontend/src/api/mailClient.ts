@@ -28,6 +28,11 @@ async function request<T>(
     } catch {
       // keep fallback
     }
+
+    if (response.status === 401 && token) {
+      window.dispatchEvent(new CustomEvent("mailux:session-expired"));
+    }
+
     throw new Error(message);
   }
 

@@ -14,18 +14,41 @@ function readSavedSession(): Session | null {
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [checkedStorage, setCheckedStorage] = useState(false);
 
   useEffect(() => {
     setSession(readSavedSession());
+    setCheckedStorage(true);
   }, []);
+
+  useEffect(() => {
+    function handleExpired() {
+      localStorage.removeItem("mailux.session");
+      setSession(null);
+      setSessionExpired(true);
+    }
+
+    window.addEventListener("mailux:session-expired", handleExpired);
+    return () => window.removeEventListener("mailux:session-expired", handleExpired);
+  }, []);
+
+  function handleLogin(nextSession: Session) {
+    setSessionExpired(false);
+    setSession(nextSession);
+  }
 
   function handleLogout() {
     localStorage.removeItem("mailux.session");
     setSession(null);
   }
 
+  if (!checkedStorage) {
+    return <div className="boot-screen" />;
+  }
+
   if (!session) {
-    return <LoginPanel onLogin={setSession} />;
+    return <LoginPanel onLogin={handleLogin} sessionExpired={sessionExpired} />;
   }
 
   return <MailShell session={session} onLogout={handleLogout} />;
