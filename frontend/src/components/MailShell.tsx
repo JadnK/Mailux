@@ -6,6 +6,7 @@ import {
   downloadAttachment,
   getMailbox,
   getMySettings,
+  markAsRead,
   sendMail,
 } from "../api/mailClient";
 import type { ComposePayload, FolderItem, Mail, Session, UserSettings } from "../types/mail";
@@ -150,6 +151,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   const [folderExists, setFolderExists] = useState(true);
   const [selectedUid, setSelectedUid] = useState<number | string | null>(null);
   const [query, setQuery] = useState("");
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -159,23 +161,25 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   const [compose, setCompose] = useState<ComposePayload>(EMPTY_COMPOSE);
   const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const displayName = mySettings?.name || session.username;
   const accountInitials = useMemo(() => initialsOf(displayName), [displayName]);
   const isTrash = activeFolder.mailbox === "Trash";
+  const unreadCount = useMemo(() => mails.filter((mail) => !mail.seen).length, [mails]);
 
   const visibleMails = useMemo(() => {
     const value = query.trim().toLowerCase();
-    if (!value) return mails;
-
     return mails.filter((mail) => {
+      if (unreadOnly && mail.seen) return false;
+      if (!value) return true;
       return [mail.from, mail.to, mail.subject, mail.text]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
         .includes(value);
     });
-  }, [mails, query]);
+  }, [mails, query, unreadOnly]);
 
   const selectedMail =
     visibleMails.find((mail) => String(mail.uid) === String(selectedUid)) ?? visibleMails[0];
@@ -211,10 +215,72 @@ export function MailShell({ session, onLogout }: MailShellProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Compose modal: Escape closes it, and the page behind it stops
+  // scrolling while it's open so it can never visually bleed into the
+  // list/reader panels underneath.
+  useEffect(() => {
+    if (!composeOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setComposeOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [composeOpen]);
+
+  // Global keyboard shortcuts: "c" starts a new message, "/" jumps to
+  // search. Both are ignored while the user is already typing somewhere,
+  // and while the compose modal has its own Escape handler above.
+  useEffect(() => {
+    function handleGlobalKeyDown(event: KeyboardEvent) {
+      if (composeOpen) return;
+
+      const target = event.target as HTMLElement | null;
+      const isTyping =
+        !!target &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (isTyping) return;
+
+      if (event.key === "c") {
+        event.preventDefault();
+        setCompose(EMPTY_COMPOSE);
+        setShowCcBcc(false);
+        setComposeOpen(true);
+      } else if (event.key === "/") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [composeOpen]);
+
   async function switchFolder(folder: FolderItem) {
     setActiveView("mail");
     setActiveFolder(folder);
     await loadFolder(folder);
+  }
+
+  function selectMail(mail: Mail) {
+    setSelectedUid(mail.uid);
+
+    if (!mail.seen) {
+      setMails((prev) => prev.map((m) => (m.uid === mail.uid ? { ...m, seen: true } : m)));
+      markAsRead(session, activeFolder.mailbox, mail.uid).catch(() => {
+        // Non-fatal - worst case the message just shows as unread again
+        // after the next reload.
+      });
+    }
   }
 
   async function handleDelete(mail: Mail | undefined) {
@@ -302,19 +368,13 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   const selectedAddress = selectedMail ? parseAddress(selectedMail.from || "") : null;
 
   return (
-    <div className="mail-app">
+    <div className={`mail-app ${activeView === "settings" ? "mail-app--single" : ""}`}>
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="account-block">
             <div className="product-name">Mailux</div>
             <div className="account-line">
-              <span className="account-avatar">
-                {mySettings?.profilePicture ? (
-                  <img src={mySettings.profilePicture} alt="" />
-                ) : (
-                  accountInitials
-                )}
-              </span>
+              <span className="account-avatar">{accountInitials}</span>
               <span>{displayName}</span>
             </div>
           </div>
@@ -334,6 +394,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
             setShowCcBcc(false);
             setComposeOpen(true);
           }}
+          title="Neue Nachricht (c)"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 5v14M5 12h14" />
@@ -353,25 +414,25 @@ export function MailShell({ session, onLogout }: MailShellProps) {
         </button>
 
         <nav className="folder-list" aria-label="Mail folders">
-          {SYSTEM_FOLDERS.map((folder) => (
-            <button
-              key={folder.mailbox}
-              className={`folder-button ${
-                activeView === "mail" && activeFolder.mailbox === folder.mailbox ? "active" : ""
-              } ${folder.destructive ? "danger-folder" : ""}`}
-              onClick={() => switchFolder(folder)}
-            >
-              <span className="folder-label">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d={folderIcon(folder.mailbox)} />
-                </svg>
-                {folder.label}
-              </span>
-              {folder.mailbox === "INBOX" && mails.length > 0 && activeFolder.mailbox === "INBOX" && (
-                <span className="folder-count">{mails.length}</span>
-              )}
-            </button>
-          ))}
+          {SYSTEM_FOLDERS.map((folder) => {
+            const isActive = activeView === "mail" && activeFolder.mailbox === folder.mailbox;
+            const badgeCount = folder.mailbox === "INBOX" && activeFolder.mailbox === "INBOX" ? unreadCount : 0;
+            return (
+              <button
+                key={folder.mailbox}
+                className={`folder-button ${isActive ? "active" : ""} ${folder.destructive ? "danger-folder" : ""}`}
+                onClick={() => switchFolder(folder)}
+              >
+                <span className="folder-label">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d={folderIcon(folder.mailbox)} />
+                  </svg>
+                  {folder.label}
+                </span>
+                {badgeCount > 0 && <span className="folder-count">{badgeCount}</span>}
+              </button>
+            );
+          })}
         </nav>
 
         <div className="sidebar-footer">
@@ -393,12 +454,24 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                     : "Ordner nicht vorhanden"}
               </p>
             </div>
-            <button className="ghost-button icon-only" onClick={() => loadFolder(activeFolder)} title="Aktualisieren" aria-label="Aktualisieren">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                <path d="M21 3v6h-6" />
-              </svg>
-            </button>
+            <div className="panel-header-actions">
+              <button
+                className={`ghost-button icon-only unread-filter-button ${unreadOnly ? "active" : ""}`}
+                onClick={() => setUnreadOnly((prev) => !prev)}
+                title={unreadOnly ? "Alle Nachrichten anzeigen" : "Nur ungelesene anzeigen"}
+                aria-pressed={unreadOnly}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4" />
+                </svg>
+              </button>
+              <button className="ghost-button icon-only" onClick={() => loadFolder(activeFolder)} title="Aktualisieren" aria-label="Aktualisieren">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                  <path d="M21 3v6h-6" />
+                </svg>
+              </button>
+            </div>
           </header>
 
           <div className="search-box">
@@ -407,9 +480,10 @@ export function MailShell({ session, onLogout }: MailShellProps) {
               <path d="m21 21-4.3-4.3" />
             </svg>
             <input
+              ref={searchInputRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Nachrichten durchsuchen"
+              placeholder="Nachrichten durchsuchen (/)"
               aria-label="Nachrichten durchsuchen"
             />
           </div>
@@ -458,20 +532,19 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                   <path d="M4 4h16v10.5l-2.2 3.7a2 2 0 0 1-1.72.98H7.92a2 2 0 0 1-1.72-.98L4 14.5V4Z" />
                   <path d="M4 4l8 7 8-7" />
                 </svg>
-                <h3>Keine Nachrichten</h3>
-                <p>Dieser Ordner ist leer.</p>
+                <h3>{unreadOnly ? "Keine ungelesenen Nachrichten" : "Keine Nachrichten"}</h3>
+                <p>{unreadOnly ? "Du hast alles gelesen." : "Dieser Ordner ist leer."}</p>
               </div>
             )}
 
             {visibleMails.map((mail) => {
               const sender = getSenderAddress(mail, activeFolder.mailbox);
+              const isSelected = String(selectedMail?.uid) === String(mail.uid);
               return (
                 <button
                   key={String(mail.uid)}
-                  className={`message-row ${
-                    String(selectedMail?.uid) === String(mail.uid) ? "selected" : ""
-                  }`}
-                  onClick={() => setSelectedUid(mail.uid)}
+                  className={`message-row ${isSelected ? "selected" : ""} ${!mail.seen ? "unread" : ""}`}
+                  onClick={() => selectMail(mail)}
                 >
                   <span className="message-avatar">{initialsOf(sender.name)}</span>
                   <span className="message-row-body">
@@ -584,7 +657,14 @@ export function MailShell({ session, onLogout }: MailShellProps) {
       )}
 
       {composeOpen && (
-        <div className="compose-overlay" role="dialog" aria-modal="true">
+        <div
+          className="compose-overlay"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setComposeOpen(false);
+          }}
+        >
           <form
             className={`compose-window ${isDroppingFile ? "dropping" : ""}`}
             onSubmit={handleSend}

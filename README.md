@@ -40,9 +40,14 @@ it's deployed).
 - **Delete = move to Trash** - available to every logged-in user for their
   own mail (not just root); deleting from Trash itself is permanent, same
   as any other mail client
-- **Profile settings** - every user can set their own display name,
-  signature and a profile picture (resized client-side before upload)
-  under "Einstellungen" - none of it requires root
+- **Profile settings** - every user can set their own display name and
+  signature under "Einstellungen" - none of it requires root
+- **Unread tracking** - the inbox badge shows the unread count (not the
+  total), unread messages are bolded with a dot in the list, opening one
+  marks it read via IMAP, and a header toggle filters the list down to
+  unread-only
+- **Keyboard shortcuts** - `c` starts a new message, `/` jumps to search,
+  `Escape` closes the compose window
 - **root is an administrator, not a mailbox** - logging in as root lands on
   a dedicated screen with exactly two things: user management (creating
   and removing mailboxes) and site-wide settings. No folders, no compose,

@@ -139,20 +139,22 @@ export function UserManagementPanel({ session }: UserManagementPanelProps) {
             <strong>Neuen User hinzufügen</strong>
           </header>
 
-          <input
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            placeholder="Username"
-            required
-          />
+          <div className="compose-body">
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="Username"
+              required
+            />
 
-          <input
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="Passwort, min. 8 Zeichen"
-            type="password"
-            required
-          />
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Passwort, min. 8 Zeichen"
+              type="password"
+              required
+            />
+          </div>
 
           <footer>
             <button className="primary-button" type="submit">
