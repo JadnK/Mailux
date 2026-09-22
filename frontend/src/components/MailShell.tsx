@@ -284,7 +284,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
               {canHardDelete && <span className="root-pill">root</span>}
             </div>
           </div>
-          <button className="icon-button" onClick={onLogout} title="Abmelden">
+          <button className="icon-button" onClick={onLogout} title="Abmelden" aria-label="Abmelden">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <path d="M16 17l5-5-5-5" />
@@ -349,7 +349,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
               <h2>{activeFolder.label}</h2>
               <p>{isLoading ? "Lade Nachrichten…" : `${visibleMails.length} Nachrichten`}</p>
             </div>
-            <button className="ghost-button icon-only" onClick={() => loadFolder(activeFolder)} title="Aktualisieren">
+            <button className="ghost-button icon-only" onClick={() => loadFolder(activeFolder)} title="Aktualisieren" aria-label="Aktualisieren">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12a9 9 0 1 1-2.64-6.36" />
                 <path d="M21 3v6h-6" />
@@ -366,11 +366,16 @@ export function MailShell({ session, onLogout }: MailShellProps) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Nachrichten durchsuchen"
+              aria-label="Nachrichten durchsuchen"
             />
           </div>
 
           {(error || notice) && (
-            <div className={error ? "inline-message error" : "inline-message"}>
+            <div
+              className={error ? "inline-message error" : "inline-message"}
+              role="status"
+              aria-live="polite"
+            >
               {error || notice}
             </div>
           )}
@@ -506,7 +511,12 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           <form className="compose-window" onSubmit={handleSend}>
             <header>
               <strong>Neue Nachricht</strong>
-              <button type="button" className="icon-button" onClick={() => setComposeOpen(false)}>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setComposeOpen(false)}
+                aria-label="Schließen"
+              >
                 ×
               </button>
             </header>

@@ -39,7 +39,7 @@ export function LoginPanel({ onLogin, sessionExpired }: LoginPanelProps) {
         <p>Schlichtes Webmail für deinen eigenen Mailserver.</p>
 
         {sessionExpired && (
-          <div className="inline-message warning">
+          <div className="inline-message warning" role="status" aria-live="polite">
             Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.
           </div>
         )}
@@ -66,7 +66,11 @@ export function LoginPanel({ onLogin, sessionExpired }: LoginPanelProps) {
             />
           </label>
 
-          {error && <div className="error-box">{error}</div>}
+          {error && (
+            <div className="error-box" role="alert" aria-live="assertive">
+              {error}
+            </div>
+          )}
 
           <button className="primary-button login-submit" disabled={isBusy}>
             {isBusy ? "Anmelden…" : "Anmelden"}

@@ -125,7 +125,11 @@ export function UserManagementPanel({ session }: UserManagementPanelProps) {
 
       <article className="message-body">
         {(error || notice) && (
-          <div className={error ? "inline-message error" : "inline-message"}>
+          <div
+            className={error ? "inline-message error" : "inline-message"}
+            role="status"
+            aria-live="polite"
+          >
             {error || notice}
           </div>
         )}

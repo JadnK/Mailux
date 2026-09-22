@@ -126,11 +126,6 @@ textarea::placeholder {
   color: var(--text-faint);
 }
 
-.boot-screen {
-  min-height: 100vh;
-  background: #090b10;
-}
-
 /* ---------- Login ---------- */
 
 .login-screen {

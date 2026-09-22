@@ -13,14 +13,11 @@ function readSavedSession(): Session | null {
 }
 
 export default function App() {
-  const [session, setSession] = useState<Session | null>(null);
+  // Read once, synchronously, during the initial render - not in an effect,
+  // which would cause an extra render pass and a visible flash of the login
+  // screen before the saved session kicks in.
+  const [session, setSession] = useState<Session | null>(() => readSavedSession());
   const [sessionExpired, setSessionExpired] = useState(false);
-  const [checkedStorage, setCheckedStorage] = useState(false);
-
-  useEffect(() => {
-    setSession(readSavedSession());
-    setCheckedStorage(true);
-  }, []);
 
   useEffect(() => {
     function handleExpired() {
@@ -41,10 +38,6 @@ export default function App() {
   function handleLogout() {
     localStorage.removeItem("mailux.session");
     setSession(null);
-  }
-
-  if (!checkedStorage) {
-    return <div className="boot-screen" />;
   }
 
   if (!session) {
