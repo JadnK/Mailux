@@ -4,9 +4,6 @@ import {
   modifyGlobalSettings,
   fetchMySettings,
   modifyMySettings,
-  uploadMyAvatar,
-  setMyAvatar,
-  removeMyAvatar,
 } from "../controllers/settingsController.js";
 import { requireRoot } from "../../middleware/auth.js";
 
@@ -17,8 +14,6 @@ const router = Router();
 // edit someone else's settings by editing the URL).
 router.get("/me", fetchMySettings);
 router.patch("/me", modifyMySettings);
-router.post("/me/avatar", uploadMyAvatar, setMyAvatar);
-router.delete("/me/avatar", removeMyAvatar);
 
 // Site-wide settings - root only.
 router.get("/global", requireRoot, fetchGlobalSettings);

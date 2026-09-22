@@ -18,7 +18,6 @@ export type SysUser = {
 export interface UserSettings {
   username: string;
   name?: string;
-  profilePicture?: string;
   signature?: string;
   canReceiveMail?: boolean;
 }

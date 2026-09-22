@@ -1,5 +1,4 @@
 import { Response } from "express";
-import multer from "multer";
 import { AuthRequest } from "../../middleware/auth.js";
 import {
   getGlobalSettings,
@@ -27,9 +26,8 @@ export const fetchMySettings = (req: AuthRequest, res: Response) => {
 };
 
 // Only these fields are user-editable via PATCH. canReceiveMail is an
-// account-level flag (managed through user administration) and
-// profilePicture has its own upload endpoint below - neither should be
-// settable through a generic PATCH body.
+// account-level flag, managed through user administration, not settable
+// here.
 const EDITABLE_FIELDS = ["name", "signature"] as const;
 
 export const modifyMySettings = (req: AuthRequest, res: Response) => {
@@ -51,47 +49,6 @@ export const modifyMySettings = (req: AuthRequest, res: Response) => {
   }
 };
 
-const MAX_AVATAR_BYTES = 1.5 * 1024 * 1024;
-
-const avatarUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_AVATAR_BYTES, files: 1 },
-  fileFilter: (_req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      cb(new Error("Only image files are allowed"));
-      return;
-    }
-    cb(null, true);
-  },
-});
-
-export const uploadMyAvatar = avatarUpload.single("avatar");
-
-export const setMyAvatar = (req: AuthRequest, res: Response) => {
-  try {
-    const file = req.file;
-    if (!file) {
-      return res.status(400).json({ message: "No image uploaded" });
-    }
-
-    const dataUrl = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
-    const updated = updateUserSettings(username(req), { profilePicture: dataUrl });
-    res.json(updated);
-  } catch (err) {
-    console.error("setMyAvatar error:", err);
-    res.status(500).json({ message: "Error uploading avatar" });
-  }
-};
-
-export const removeMyAvatar = (req: AuthRequest, res: Response) => {
-  try {
-    const updated = updateUserSettings(username(req), { profilePicture: undefined });
-    res.json(updated);
-  } catch (err) {
-    console.error("removeMyAvatar error:", err);
-    res.status(500).json({ message: "Error removing avatar" });
-  }
-};
 
 // ---------- site-wide settings (root only - enforced at the route level) ----------
 
