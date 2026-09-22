@@ -1,0 +1,42 @@
+[Unit]
+Description=Mailux backend API
+Documentation=https://github.com/JadnK/Mailux
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Mailux manages Linux system accounts (useradd/deluser/chpasswd) and
+# authenticates against them via PAM, which requires root. It also needs to
+# read/write Maildir under arbitrary users' home directories. Running this
+# unit as anything other than root will make user management and login
+# fail - see docs/SECURITY.md for the reasoning and the trade-offs.
+User=root
+Group=root
+
+WorkingDirectory=/opt/mailux/backend
+EnvironmentFile=/etc/mailux/backend.env
+ExecStart=/usr/bin/node dist/index.js
+
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=10
+
+# Hardening. Kept deliberately conservative: this service edits /etc/passwd
+# and Maildirs anywhere on the filesystem, so it cannot be sandboxed as
+# tightly as a typical service. What's left is enabled.
+NoNewPrivileges=false
+ProtectSystem=false
+ProtectHome=false
+PrivateTmp=true
+UMask=0027
+
+# Structured logs go to the journal; read them with:
+#   journalctl -u mailux-backend -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mailux-backend
+
+[Install]
+WantedBy=multi-user.target

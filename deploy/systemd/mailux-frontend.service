@@ -1,0 +1,36 @@
+[Unit]
+Description=Mailux frontend (static web UI)
+Documentation=https://github.com/JadnK/Mailux
+After=network-online.target mailux-backend.service
+Wants=network-online.target
+BindsTo=mailux-backend.service
+
+[Service]
+Type=simple
+
+# The frontend only serves static files - it does not need root. Run it as
+# a dedicated, unprivileged user.
+User=mailux-web
+Group=mailux-web
+
+WorkingDirectory=/opt/mailux/frontend
+Environment=NODE_ENV=production
+Environment=PORT=4173
+ExecStart=/usr/bin/node node_modules/serve/build/main.js -s dist -l 4173
+
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=10
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/opt/mailux/frontend
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mailux-frontend
+
+[Install]
+WantedBy=multi-user.target
