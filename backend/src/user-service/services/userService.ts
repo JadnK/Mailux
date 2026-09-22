@@ -1,5 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
+import { execFileSync, spawnSync } from "child_process";
+import { env } from "../../config/env.js";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
@@ -32,13 +34,47 @@ type PamModule =
     }
   | ((...args: any[]) => any);
 
+const USERNAME_PATTERN = /^[a-z_][a-z0-9_-]{0,31}$/;
+
+function assertValidUsername(username: string): void {
+  if (!USERNAME_PATTERN.test(username)) {
+    throw new Error("Invalid username");
+  }
+}
+
+/**
+ * Runs a privileged system command directly (no shell, no `sudo`).
+ *
+ * This process is meant to run as root via systemd (see docs/DEPLOYMENT.md),
+ * so `sudo` is both unnecessary and risky here: a non-interactive systemd
+ * service has no TTY, so a `sudo` call that unexpectedly needs a password
+ * simply hangs. Using execFile (not exec) also means arguments are never
+ * interpolated into a shell string, which rules out shell-injection via a
+ * crafted username.
+ */
+function runPrivileged(command: string, args: string[]): void {
+  execFileSync(command, args, { stdio: "pipe" });
+}
+
+/** Sets a system user's password via chpasswd's stdin, never via argv/echo. */
+function setSystemPassword(username: string, password: string): void {
+  const result = spawnSync("chpasswd", [], {
+    input: `${username}:${password}\n`,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  if (result.status !== 0) {
+    throw new Error(`chpasswd failed: ${result.stderr?.toString().trim() || "unknown error"}`);
+  }
+}
+
 export default class UserService {
   private userSettingsStore: Map<string, UserSettings> = new Map();
   private cacheTimestamp: number | null = null;
 
   constructor(private options?: { minUid?: number }) {
     if (!this.options) this.options = {};
-    if (!this.options.minUid) this.options.minUid = 1000;
+    if (!this.options.minUid) this.options.minUid = env.minUid;
   }
 
   private parsePasswdLine(line: string): SysUser | null {
@@ -93,7 +129,7 @@ export default class UserService {
       const user = this.parsePasswdLine(line);
       if (!user) continue;
 
-      if (user.uid >= (this.options?.minUid ?? 1000) && user.username !== "root") {
+      if (user.uid >= (this.options?.minUid ?? env.minUid) && user.username !== "root") {
         users.push(user);
       }
     }
@@ -156,12 +192,15 @@ export default class UserService {
   }
 
   public async deleteUser(username: string): Promise<boolean> {
+    assertValidUsername(username);
+
+    if (username === "root") {
+      throw new Error("Refusing to remove the root account");
+    }
+
     try {
-      const { execSync } = require("child_process");
-
-      execSync(`sudo deluser --remove-home "${username}"`, { stdio: "pipe" });
+      runPrivileged("deluser", ["--remove-home", username]);
       this.userSettingsStore.delete(username);
-
       return true;
     } catch (error) {
       console.error("Error deleting user:", error);
@@ -186,71 +225,60 @@ export default class UserService {
     return Array.from(this.userSettingsStore.values());
   }
 
-public async createUser(username: string, password: string): Promise<boolean> {
-  try {
-    const { execSync } = require("child_process");
+  public async createUser(username: string, password: string): Promise<boolean> {
+    assertValidUsername(username);
 
-    const mailBase = "/mailuser";
-    const userHome = `${mailBase}/${username}`;
-    const mailDir = `${userHome}/Maildir`;
+    try {
+      const mailBase = env.mailBaseDir;
+      const userHome = path.posix.join(mailBase, username);
+      const mailDir = path.posix.join(userHome, "Maildir");
 
-    execSync(`sudo mkdir -p "${mailBase}"`, { stdio: "pipe" });
+      runPrivileged("mkdir", ["-p", mailBase]);
+      runPrivileged("useradd", ["-m", "-d", userHome, "-s", "/usr/sbin/nologin", username]);
 
-    execSync(`sudo useradd -m -d "${userHome}" -s /usr/sbin/nologin "${username}"`, {
-      stdio: "pipe",
-    });
+      const folders = [
+        `${mailDir}/cur`,
+        `${mailDir}/new`,
+        `${mailDir}/tmp`,
 
-    const folders = [
-      `${mailDir}/cur`,
-      `${mailDir}/new`,
-      `${mailDir}/tmp`,
+        `${mailDir}/.Sent/cur`,
+        `${mailDir}/.Sent/new`,
+        `${mailDir}/.Sent/tmp`,
 
-      `${mailDir}/.Sent/cur`,
-      `${mailDir}/.Sent/new`,
-      `${mailDir}/.Sent/tmp`,
+        `${mailDir}/.Trash/cur`,
+        `${mailDir}/.Trash/new`,
+        `${mailDir}/.Trash/tmp`,
 
-      `${mailDir}/.Trash/cur`,
-      `${mailDir}/.Trash/new`,
-      `${mailDir}/.Trash/tmp`,
+        `${mailDir}/.Drafts/cur`,
+        `${mailDir}/.Drafts/new`,
+        `${mailDir}/.Drafts/tmp`,
+      ];
 
-      `${mailDir}/.Drafts/cur`,
-      `${mailDir}/.Drafts/new`,
-      `${mailDir}/.Drafts/tmp`,
-    ];
+      for (const folder of folders) {
+        runPrivileged("mkdir", ["-p", folder]);
+      }
 
-    for (const folder of folders) {
-      execSync(`sudo mkdir -p "${folder}"`, { stdio: "pipe" });
+      runPrivileged("chown", ["-R", `${username}:${username}`, mailDir]);
+      runPrivileged("chmod", ["-R", "700", mailDir]);
+      setSystemPassword(username, password);
+
+      this.userSettingsStore.set(username, {
+        username,
+        canReceiveMail: true,
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Error creating user:", error);
+      return false;
     }
-
-    execSync(`sudo chown -R "${username}:${username}" "${mailDir}"`, {
-      stdio: "pipe",
-    });
-
-    execSync(`sudo chmod -R 700 "${mailDir}"`, {
-      stdio: "pipe",
-    });
-
-    execSync(`echo "${username}:${password}" | sudo chpasswd`, {
-      stdio: "pipe",
-    });
-
-    this.userSettingsStore.set(username, {
-      username,
-      canReceiveMail: true,
-    });
-
-    return true;
-  } catch (error) {
-    console.error("Error creating user:", error);
-    return false;
   }
-}
 }
 
 export const authenticateUser = (
   username: string,
   password: string,
-  service = "mailux"
+  service: string = env.pamServiceName
 ): Promise<boolean> => {
   return new Promise<boolean>((resolve, reject) => {
     let pam: PamModule | null = null;
@@ -264,10 +292,7 @@ export const authenticateUser = (
 
     const cb = (err: Error | null) => {
       if (err) {
-        console.error(
-          `PAM auth failed (user=${username}, service=${service}):`,
-          err.message || err
-        );
+        console.error(`PAM auth failed (user=${username}, service=${service}):`, err.message || err);
         return reject(err);
       }
 
@@ -276,16 +301,12 @@ export const authenticateUser = (
 
     try {
       if (pam && typeof (pam as any).authenticate === "function") {
-        (pam as any).authenticate(username, password, cb, {
-          serviceName: service,
-        });
+        (pam as any).authenticate(username, password, cb, { serviceName: service });
         return;
       }
 
       if (typeof pam === "function") {
-        (pam as any)(username, password, cb, {
-          serviceName: service,
-        });
+        (pam as any)(username, password, cb, { serviceName: service });
         return;
       }
 

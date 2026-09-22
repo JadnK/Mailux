@@ -13,7 +13,6 @@ export const listUsers = async (req: Request, res: Response) => {
   }
 };
 
-
 export const getSingleUser = async (req: Request, res: Response) => {
   try {
     const username = req.params.username;
@@ -28,7 +27,6 @@ export const getSingleUser = async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Failed to get user" });
   }
 };
-
 
 export const updateUser = async (req: Request, res: Response) => {
   try {
@@ -46,26 +44,27 @@ export const updateUser = async (req: Request, res: Response) => {
   }
 };
 
-
 export const deactivateUser = async (req: Request, res: Response) => {
   try {
     const username = req.params.username;
     if (!username) return res.status(400).json({ message: "username required" });
 
     const ok = await userService.deleteUser(username);
-    if (!ok) return res.status(404).json({ message: "User not found or already inactive" });
+    if (!ok) return res.status(404).json({ message: "User not found or could not be removed" });
 
-    return res.json({ message: "User deactivated" });
+    return res.json({ message: "User removed" });
   } catch (err) {
     console.error("deactivateUser error:", err);
-    return res.status(500).json({ message: "Failed to deactivate user" });
+    const message = err instanceof Error ? err.message : "Failed to remove user";
+    // assertValidUsername / the root guard throw with a safe, user-facing message.
+    return res.status(400).json({ message });
   }
 };
 
 export const createUser = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body as { username?: string; password?: string };
-    
+
     if (!username || !password) {
       return res.status(400).json({ message: "Username and password required" });
     }

@@ -1,28 +1,34 @@
 import { Router } from "express";
-import jwt from "jsonwebtoken";
+import rateLimit from "express-rate-limit";
 import { authenticateUser } from "../user-service/services/userService.js";
+import { createSession } from "../auth/sessionStore.js";
 
 const router = Router();
 
-router.post("/", async (req, res) => {
+// PAM auth is only as strong as the account password behind it, and this
+// endpoint can authenticate as root - rate-limit it against brute-forcing.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many login attempts. Please try again later." },
+});
+
+router.post("/", loginLimiter, async (req, res) => {
   const { username, password } = req.body as { username?: string; password?: string };
 
   if (!username || !password) {
-    return res.status(400).json({ message: "Username and password required" });
+    return res.status(400).json({ message: "Username and password are required" });
   }
 
   try {
-    await authenticateUser(username, password, "login"); 
-  } catch (err: any) {
+    await authenticateUser(username, password);
+  } catch {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
-  const token = jwt.sign(
-    { username, password }, 
-    process.env.JWT_SECRET || "secretkey",
-    { expiresIn: "30d" }
-  );
-
+  const token = createSession(username, password);
   return res.json({ username, token });
 });
 
