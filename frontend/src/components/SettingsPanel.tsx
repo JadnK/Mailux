@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 
-import { getMySettings, updateMySettings } from "../api/mailClient";
+import { getMyForwarding, getMySettings, updateMyForwarding, updateMySettings } from "../api/mailClient";
 import type { Session, UserSettings } from "../types/mail";
 import { initialsOf } from "../utils/text";
 
@@ -14,10 +14,14 @@ type SettingsPanelProps = {
 export function SettingsPanel({ session, onSettingsChange }: SettingsPanelProps) {
   const [name, setName] = useState("");
   const [signature, setSignature] = useState("");
+  const [forwardingAddress, setForwardingAddress] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingForwarding, setIsSavingForwarding] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [forwardingNotice, setForwardingNotice] = useState("");
+  const [forwardingError, setForwardingError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -25,10 +29,14 @@ export function SettingsPanel({ session, onSettingsChange }: SettingsPanelProps)
     (async () => {
       setIsLoading(true);
       try {
-        const data = await getMySettings(session);
+        const [data, forwarding] = await Promise.all([
+          getMySettings(session),
+          getMyForwarding(session).catch(() => ({ forwardingAddress: null })),
+        ]);
         if (cancelled) return;
         setName(data.name);
         setSignature(data.signature);
+        setForwardingAddress(forwarding.forwardingAddress ?? "");
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Einstellungen konnten nicht geladen werden");
@@ -58,6 +66,25 @@ export function SettingsPanel({ session, onSettingsChange }: SettingsPanelProps)
       setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleSaveForwarding(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setForwardingError("");
+    setForwardingNotice("");
+    setIsSavingForwarding(true);
+
+    try {
+      const updated = await updateMyForwarding(session, forwardingAddress.trim() || null);
+      setForwardingAddress(updated.forwardingAddress ?? "");
+      setForwardingNotice(
+        updated.forwardingAddress ? "Weiterleitung aktiviert." : "Weiterleitung deaktiviert."
+      );
+    } catch (err) {
+      setForwardingError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
+    } finally {
+      setIsSavingForwarding(false);
     }
   }
 
@@ -119,6 +146,45 @@ export function SettingsPanel({ session, onSettingsChange }: SettingsPanelProps)
             <footer className="settings-form-footer">
               <button className="primary-button" type="submit" disabled={isSaving}>
                 {isSaving ? "Speichert…" : "Speichern"}
+              </button>
+            </footer>
+          </form>
+        )}
+
+        {!isLoading && (
+          <form className="settings-form settings-form--forwarding" onSubmit={handleSaveForwarding}>
+            <div className="settings-section-heading">
+              <h2>Weiterleitung</h2>
+              <p>Eingehende Mails werden zusätzlich an diese Adresse weitergeleitet.</p>
+            </div>
+
+            {(forwardingError || forwardingNotice) && (
+              <div
+                className={forwardingError ? "inline-message error" : "inline-message success"}
+                role="status"
+                aria-live="polite"
+              >
+                {forwardingError || forwardingNotice}
+              </div>
+            )}
+
+            <label>
+              Weiterleiten an
+              <input
+                type="email"
+                value={forwardingAddress}
+                onChange={(event) => setForwardingAddress(event.target.value)}
+                placeholder="z. B. name@anderer-anbieter.de (leer lassen zum Deaktivieren)"
+              />
+              <span className="settings-field-hint">
+                Mails bleiben zusätzlich in diesem Postfach erhalten - die Weiterleitung ersetzt
+                den Empfang hier nicht.
+              </span>
+            </label>
+
+            <footer className="settings-form-footer">
+              <button className="primary-button" type="submit" disabled={isSavingForwarding}>
+                {isSavingForwarding ? "Speichert…" : "Weiterleitung speichern"}
               </button>
             </footer>
           </form>

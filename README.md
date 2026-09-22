@@ -33,6 +33,13 @@ it's deployed).
   straight from IMAP, auto-created on first visit if an account (or a
   particular folder) predates Mailux, instead of permanently showing
   "folder doesn't exist"
+- **Custom folders + move/right-click actions** - create your own IMAP
+  folders from the sidebar, drag a message onto any folder to move it, or
+  right-click a message for a context menu (move, mark read/unread,
+  delete)
+- **Per-account mail forwarding** - optionally forward incoming mail to
+  another address from "Einstellungen"; mail also stays in the account
+  it's configured on, it isn't a redirect
 - **Attachments** - drag-and-drop or pick files onto a new message, and
   download attachments straight from a received mail
 - **Compose & reply** - Gmail-style inline reply under the open message
