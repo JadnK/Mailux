@@ -6,6 +6,7 @@ import {
   getMailbox,
   getAttachmentContent,
   deleteMail,
+  markAsRead,
 } from "../services/mailService.js";
 import { MailAttachmentInput, MailData } from "../types/mail.js";
 
@@ -98,6 +99,19 @@ export const downloadAttachment = async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error("downloadAttachment error:", err);
     res.status(500).json({ message: "Failed to download attachment" });
+  }
+};
+
+export const markMailRead = async (req: AuthRequest, res: Response) => {
+  try {
+    const { username, password } = credentials(req);
+    const { mailbox, uid } = req.params;
+
+    await markAsRead(username, password, mailbox, Number(uid));
+    res.status(200).json({ message: "Marked as read" });
+  } catch (err) {
+    console.error("markMailRead error:", err);
+    res.status(500).json({ message: "Failed to mark mail as read" });
   }
 };
 

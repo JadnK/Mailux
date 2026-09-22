@@ -23,6 +23,7 @@ export type Mail = {
   text?: string;
   html?: string;
   attachments: MailAttachment[];
+  seen: boolean;
 };
 
 export type MailboxResponse = {
@@ -65,7 +66,6 @@ export type UserSettings = {
   canReceiveMail: boolean;
   vacationMode: boolean;
   vacationMessage?: string;
-  profilePicture?: string;
 };
 
 export type GlobalSettings = {

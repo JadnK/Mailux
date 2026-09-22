@@ -28,6 +28,7 @@ export type MailSummary = {
   text?: string;
   html?: string;
   attachments: MailAttachmentMeta[];
+  seen: boolean;
 };
 
 export type MailboxResult = {
@@ -99,6 +100,7 @@ async function parseMessage(rawPart: any): Promise<MailSummary> {
     text: parsed.text || "",
     html: typeof parsed.html === "string" ? parsed.html : "",
     attachments: toAttachmentMeta(parsed.attachments),
+    seen: false, // overwritten by the caller, which has the IMAP flags
   };
 }
 
@@ -145,7 +147,8 @@ async function fetchMailbox(
       messages.map(async (msg: any) => {
         const allParts = msg.parts.find((p: any) => p.which === "");
         const summary = await parseMessage(allParts.body);
-        return { ...summary, uid: msg.attributes.uid };
+        const flags: string[] = msg.attributes?.flags ?? [];
+        return { ...summary, uid: msg.attributes.uid, seen: flags.includes("\\Seen") };
       })
     );
 
@@ -196,6 +199,23 @@ export const getAttachmentContent = async (
       contentType: attachment.contentType || "application/octet-stream",
       content: attachment.content,
     };
+  } finally {
+    connection.end();
+  }
+};
+
+export const markAsRead = async (
+  username: string,
+  password: string,
+  mailbox: string,
+  mailUid: number
+): Promise<void> => {
+  const imapConfig = getImapConfig(username, password);
+  const connection = await imaps.connect(imapConfig);
+
+  try {
+    await connection.openBox(mailbox);
+    await connection.addFlags(mailUid, "\\Seen");
   } finally {
     connection.end();
   }

@@ -122,6 +122,18 @@ export async function deleteMail(
   );
 }
 
+export async function markAsRead(
+  session: Session,
+  mailbox: string,
+  uid: number | string
+): Promise<void> {
+  await requestJson<{ message: string }>(
+    `/mail/box/${encodeURIComponent(mailbox)}/${encodeURIComponent(String(uid))}/read`,
+    { method: "PATCH" },
+    session.token
+  );
+}
+
 export function attachmentDownloadUrl(mailbox: string, uid: number | string, index: number): string {
   return `${API_BASE}/mail/attachment/${encodeURIComponent(mailbox)}/${encodeURIComponent(
     String(uid)
@@ -167,7 +179,6 @@ export function isRootUser(username: string): boolean {
 export type ManagedUser = {
   username: string;
   name?: string;
-  profilePicture?: string;
   signature?: string;
   canReceiveMail?: boolean;
 };
@@ -215,22 +226,6 @@ export async function updateMySettings(
   );
 }
 
-export async function uploadMyAvatar(session: Session, image: Blob): Promise<UserSettings> {
-  const form = new FormData();
-  form.append("avatar", image, "avatar.jpg");
-
-  const response = await fetch(`${API_BASE}/settings/me/avatar`, {
-    method: "POST",
-    headers: authHeaders(session.token),
-    body: form,
-  });
-
-  return handleResponse<UserSettings>(response, session.token);
-}
-
-export async function removeMyAvatar(session: Session): Promise<UserSettings> {
-  return requestJson<UserSettings>("/settings/me/avatar", { method: "DELETE" }, session.token);
-}
 
 // ---------- site-wide settings (root only) ----------
 
