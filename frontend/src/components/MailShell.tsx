@@ -156,6 +156,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
+  const [replyOpen, setReplyOpen] = useState(false);
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [isDroppingFile, setIsDroppingFile] = useState(false);
   const [compose, setCompose] = useState<ComposePayload>(EMPTY_COMPOSE);
@@ -237,6 +238,22 @@ export function MailShell({ session, onLogout }: MailShellProps) {
     };
   }, [composeOpen]);
 
+  // The inline reply box isn't a modal (nothing behind it needs to be
+  // blocked), so it only needs its own Escape-to-dismiss, not the scroll
+  // lock above.
+  useEffect(() => {
+    if (!replyOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setReplyOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [replyOpen]);
+
   // Global keyboard shortcuts: "c" starts a new message, "/" jumps to
   // search. Both are ignored while the user is already typing somewhere,
   // and while the compose modal has its own Escape handler above.
@@ -268,11 +285,13 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   async function switchFolder(folder: FolderItem) {
     setActiveView("mail");
     setActiveFolder(folder);
+    setReplyOpen(false);
     await loadFolder(folder);
   }
 
   function selectMail(mail: Mail) {
     setSelectedUid(mail.uid);
+    setReplyOpen(false);
 
     if (!mail.seen) {
       setMails((prev) => prev.map((m) => (m.uid === mail.uid ? { ...m, seen: true } : m)));
@@ -335,6 +354,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
       setCompose(EMPTY_COMPOSE);
       setShowCcBcc(false);
       setComposeOpen(false);
+      setReplyOpen(false);
       setNotice("Nachricht wurde gesendet.");
       if (activeFolder.mailbox === "Sent") await loadFolder(activeFolder);
     } catch (err) {
@@ -344,17 +364,22 @@ export function MailShell({ session, onLogout }: MailShellProps) {
     }
   }
 
+  // Gmail-style reply: an inline composer under the open message, not a
+  // separate modal on top of it - so the message you're replying to stays
+  // visible while you write, instead of being hidden and dumped as a
+  // quoted text blob into the textarea.
   function openReply(mail: Mail) {
     setCompose({
       to: mail.from,
       cc: "",
       bcc: "",
       subject: mail.subject?.startsWith("Re:") ? mail.subject : `Re: ${mail.subject || ""}`,
-      text: `\n\n--- Original ---\n${plainPreview(mail)}`,
+      text: "",
       attachments: [],
     });
     setShowCcBcc(false);
-    setComposeOpen(true);
+    setComposeOpen(false);
+    setReplyOpen(true);
   }
 
   async function handleDownloadAttachment(mail: Mail, attachmentIndex: number, filename: string) {
@@ -392,6 +417,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           onClick={() => {
             setCompose(EMPTY_COMPOSE);
             setShowCcBcc(false);
+            setReplyOpen(false);
             setComposeOpen(true);
           }}
           title="Neue Nachricht (c)"
@@ -434,11 +460,6 @@ export function MailShell({ session, onLogout }: MailShellProps) {
             );
           })}
         </nav>
-
-        <div className="sidebar-footer">
-          <span className="status-dot" />
-          <span>IMAP verbunden</span>
-        </div>
       </aside>
 
       {activeView === "mail" && (
@@ -640,6 +661,43 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                   <iframe title="Nachricht" sandbox="" srcDoc={wrapMailHtml(selectedMail.html)} />
                 ) : (
                   <pre>{selectedMail.text || "Diese Nachricht hat keinen lesbaren Inhalt."}</pre>
+                )}
+
+                {replyOpen && (
+                  <form className="inline-reply" onSubmit={handleSend}>
+                    <header>
+                      <span>
+                        Antwort an <strong>{selectedAddress?.name}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        onClick={() => setReplyOpen(false)}
+                        aria-label="Antwort verwerfen"
+                      >
+                        ×
+                      </button>
+                    </header>
+                    <div className="compose-body">
+                      <textarea
+                        value={compose.text}
+                        onChange={(event) => setCompose({ ...compose, text: event.target.value })}
+                        placeholder="Antwort schreiben…"
+                        aria-label="Antwort"
+                        rows={6}
+                        autoFocus
+                        required
+                      />
+                    </div>
+                    <footer>
+                      <button type="button" className="ghost-button" onClick={() => setReplyOpen(false)}>
+                        Verwerfen
+                      </button>
+                      <button className="primary-button" disabled={isSending}>
+                        {isSending ? "Sende…" : "Senden"}
+                      </button>
+                    </footer>
+                  </form>
                 )}
               </article>
             </>

@@ -71,11 +71,6 @@ export function AdminShell({ session, onLogout }: AdminShellProps) {
             </span>
           </button>
         </nav>
-
-        <div className="sidebar-footer">
-          <span className="status-dot" />
-          <span>IMAP verbunden</span>
-        </div>
       </aside>
 
       {activeView === "users" ? (

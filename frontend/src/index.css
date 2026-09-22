@@ -3,22 +3,22 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Inter+Tight:wght@600;700;800&display=swap");
 
 :root {
-  --bg: #08080c;
-  --bg-elevated: #0d0d13;
-  --surface: #14141b;
-  --surface-2: #191922;
-  --surface-hover: #202029;
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.13);
-  --text: #f2f2f5;
-  --text-secondary: #9c9ca9;
-  --text-tertiary: #66666f;
-  --accent: #8d85f5;
-  --accent-strong: #756bf0;
-  --accent-soft: rgba(141, 133, 245, 0.16);
-  --accent-contrast: #100e24;
-  --accent-2: #38bdf8;
-  --accent-2-strong: #1d8fd1;
+  --bg: #0a0a0b;
+  --bg-elevated: #101012;
+  --surface: #161618;
+  --surface-2: #1b1b1e;
+  --surface-hover: #222225;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #f5f5f6;
+  --text-secondary: #9c9ca1;
+  --text-tertiary: #6a6a6f;
+  --accent: #f2f2f3;
+  --accent-strong: #d4d4d6;
+  --accent-soft: rgba(255, 255, 255, 0.1);
+  --accent-contrast: #0a0a0b;
+  --accent-2: #6b6b71;
+  --accent-2-strong: #333336;
   --danger: #f0654f;
   --danger-soft: rgba(240, 101, 79, 0.12);
   --warning: #f5b84e;
@@ -26,9 +26,9 @@
   --radius-sm: 8px;
   --radius-md: 13px;
   --radius-lg: 19px;
-  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.5);
-  --shadow-lifted: 0 28px 70px -22px rgba(0, 0, 0, 0.7), 0 2px 10px rgba(0, 0, 0, 0.35);
-  --shadow-glow: 0 0 0 1px rgba(141, 133, 245, 0.28), 0 8px 26px -6px rgba(141, 133, 245, 0.3);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.55);
+  --shadow-lifted: 0 28px 70px -22px rgba(0, 0, 0, 0.75), 0 2px 10px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 0 1px rgba(255, 255, 255, 0.22), 0 8px 26px -6px rgba(255, 255, 255, 0.16);
   --font-ui: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Inter Tight", "Inter", ui-sans-serif, sans-serif;
 }
@@ -42,6 +42,7 @@ body,
 #root {
   margin: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -60,8 +61,8 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(760px 420px at 14% -6%, rgba(141, 133, 245, 0.09), transparent 60%),
-    radial-gradient(620px 520px at 100% 0%, rgba(56, 189, 248, 0.05), transparent 55%);
+    radial-gradient(760px 420px at 14% -6%, rgba(255, 255, 255, 0.05), transparent 60%),
+    radial-gradient(620px 520px at 100% 0%, rgba(255, 255, 255, 0.03), transparent 55%);
 }
 
 button,
@@ -72,7 +73,7 @@ textarea {
 }
 
 ::selection {
-  background: rgba(141, 133, 245, 0.32);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 * {
@@ -104,19 +105,19 @@ textarea {
   padding: 10px 18px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, #a89dfa, var(--accent-strong));
+  background: linear-gradient(180deg, #ffffff, var(--accent-strong));
   color: var(--accent-contrast);
   font-weight: 650;
   font-size: 13.5px;
   letter-spacing: -0.01em;
   cursor: pointer;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 6px 16px -6px rgba(141, 133, 245, 0.55);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 6px 16px -6px rgba(255, 255, 255, 0.55);
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
 }
 .primary-button:hover {
   filter: brightness(1.06);
   transform: translateY(-1px);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 10px 22px -6px rgba(141, 133, 245, 0.6);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 10px 22px -6px rgba(255, 255, 255, 0.6);
 }
 .primary-button:active {
   transform: translateY(0);
@@ -224,9 +225,9 @@ textarea {
   color: #ffab9d;
 }
 .inline-message.success {
-  border-color: rgba(141, 133, 245, 0.3);
+  border-color: rgba(255, 255, 255, 0.3);
   background: var(--accent-soft);
-  color: #c3bcfb;
+  color: var(--text);
 }
 .inline-message.warning {
   border-color: rgba(245, 184, 78, 0.3);
@@ -251,7 +252,7 @@ textarea {
   width: 720px;
   height: 720px;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(141, 133, 245, 0.14) 0%, rgba(141, 133, 245, 0) 68%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 68%);
   pointer-events: none;
   z-index: 0;
 }
@@ -273,13 +274,13 @@ textarea {
   display: grid;
   place-items: center;
   border-radius: 11px;
-  background: linear-gradient(150deg, #a89dfa, var(--accent-strong));
+  background: linear-gradient(150deg, #ffffff, var(--accent-strong));
   color: var(--accent-contrast);
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 18px;
   margin-bottom: 22px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 8px 20px -8px rgba(141, 133, 245, 0.6);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 8px 20px -8px rgba(255, 255, 255, 0.6);
 }
 
 .login-card h1 {
@@ -360,6 +361,7 @@ textarea {
   display: grid;
   grid-template-columns: 258px 360px 1fr;
   height: 100vh;
+  overflow: hidden;
 }
 
 .mail-app.admin-app,
@@ -370,6 +372,8 @@ textarea {
 .sidebar {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
   padding: 18px 14px;
   background: var(--bg-elevated);
   border-right: 1px solid var(--border);
@@ -417,8 +421,9 @@ textarea {
 .root-pill {
   padding: 2px 7px;
   border-radius: 99px;
-  background: var(--warning-soft);
-  color: #ffd88f;
+  border: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -448,12 +453,12 @@ textarea {
   margin: 4px 0 16px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, #a89dfa, var(--accent-strong));
+  background: linear-gradient(180deg, #ffffff, var(--accent-strong));
   color: var(--accent-contrast);
   font-weight: 650;
   font-size: 13.5px;
   cursor: pointer;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 10px 24px -10px rgba(141, 133, 245, 0.65);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 10px 24px -10px rgba(255, 255, 255, 0.65);
   transition: transform 0.15s ease, filter 0.15s ease;
 }
 .compose-button:hover {
@@ -515,11 +520,11 @@ textarea {
 }
 .folder-button.active {
   background: var(--accent-soft);
-  color: #c3bcfb;
+  color: var(--text);
   font-weight: 600;
 }
 .folder-button.active svg {
-  stroke: #c3bcfb;
+  stroke: var(--text);
 }
 .folder-button.danger-folder.active {
   background: var(--danger-soft);
@@ -551,33 +556,16 @@ textarea {
   font-weight: 750;
 }
 
-.sidebar-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 8px 2px;
-  color: var(--text-tertiary);
-  font-size: 11.5px;
-  border-top: 1px solid var(--border);
-  margin-top: 8px;
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
 /* ---------- message list ---------- */
 
 .message-list-panel {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   background: var(--bg);
   border-right: 1px solid var(--border);
-  min-width: 0;
 }
 
 .panel-header {
@@ -595,7 +583,7 @@ textarea {
 
 .unread-filter-button.active {
   background: var(--accent-soft);
-  border-color: rgba(141, 133, 245, 0.35);
+  border-color: rgba(255, 255, 255, 0.35);
   color: var(--accent);
 }
 .unread-filter-button.active svg {
@@ -647,6 +635,7 @@ textarea {
 
 .message-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 0 10px 16px;
 }
@@ -844,12 +833,14 @@ textarea {
 .reader-panel {
   display: flex;
   flex-direction: column;
-  background: var(--bg);
   min-width: 0;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
 }
 
 .reader-header {
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -909,6 +900,7 @@ textarea {
 }
 
 .attachment-list {
+  flex-shrink: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -981,6 +973,11 @@ textarea {
 
 .message-body {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   padding: 22px 28px 32px;
 }
 .message-body iframe {
@@ -1138,6 +1135,48 @@ textarea {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* ============ inline reply (Gmail-style, embedded under the ============ */
+/* ============ open message instead of a modal on top of it)   ============ */
+
+.inline-reply {
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.inline-reply > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.inline-reply > header strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.inline-reply .compose-body {
+  padding: 14px 16px;
+}
+.inline-reply textarea {
+  min-height: 120px;
+}
+
+.inline-reply > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
 }
 
 /* ============ settings (own profile + site-wide) ============ */
