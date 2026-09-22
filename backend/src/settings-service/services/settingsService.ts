@@ -14,6 +14,8 @@ interface UserSettings {
   canReceiveMail: boolean;
   vacationMode: boolean;
   vacationMessage?: string;
+  /** A small avatar image as a data: URL (set via the avatar upload endpoint). */
+  profilePicture?: string;
 }
 
 interface GlobalSettings {
@@ -65,6 +67,7 @@ function defaultUserSettings(username: string, globalSettings: GlobalSettings): 
     canReceiveMail: true,
     vacationMode: false,
     vacationMessage: "",
+    profilePicture: undefined,
   };
 }
 
