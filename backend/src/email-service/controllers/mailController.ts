@@ -7,6 +7,10 @@ import {
   getAttachmentContent,
   deleteMail,
   markAsRead,
+  markAsUnread,
+  listFolders,
+  createFolder,
+  moveMail,
 } from "../services/mailService.js";
 import { MailAttachmentInput, MailData } from "../types/mail.js";
 
@@ -115,6 +119,19 @@ export const markMailRead = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const markMailUnread = async (req: AuthRequest, res: Response) => {
+  try {
+    const { username, password } = credentials(req);
+    const { mailbox, uid } = req.params;
+
+    await markAsUnread(username, password, mailbox, Number(uid));
+    res.status(200).json({ message: "Marked as unread" });
+  } catch (err) {
+    console.error("markMailUnread error:", err);
+    res.status(500).json({ message: "Failed to mark mail as unread" });
+  }
+};
+
 export const deleteEmail = async (req: AuthRequest, res: Response) => {
   try {
     const { username, password } = credentials(req);
@@ -129,5 +146,50 @@ export const deleteEmail = async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error("deleteEmail error:", err);
     res.status(500).json({ message: "Failed to delete mail" });
+  }
+};
+export const getFolders = async (req: AuthRequest, res: Response) => {
+  try {
+    const { username, password } = credentials(req);
+    const folders = await listFolders(username, password);
+    res.json({ folders });
+  } catch (err) {
+    console.error("getFolders error:", err);
+    res.status(500).json({ message: "Failed to load folders" });
+  }
+};
+
+export const createMailFolder = async (req: AuthRequest, res: Response) => {
+  try {
+    const { username, password } = credentials(req);
+    const { name } = req.body as { name?: string };
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Folder name is required" });
+    }
+
+    await createFolder(username, password, name);
+    res.status(201).json({ message: "Folder created" });
+  } catch (err: any) {
+    console.error("createMailFolder error:", err);
+    res.status(400).json({ message: err?.message || "Failed to create folder" });
+  }
+};
+
+export const moveEmail = async (req: AuthRequest, res: Response) => {
+  try {
+    const { username, password } = credentials(req);
+    const { mailbox, uid } = req.params;
+    const { target } = req.body as { target?: string };
+
+    if (!target || !target.trim()) {
+      return res.status(400).json({ message: "Target folder is required" });
+    }
+
+    await moveMail(username, password, mailbox, Number(uid), target);
+    res.status(200).json({ message: "Mail moved" });
+  } catch (err) {
+    console.error("moveEmail error:", err);
+    res.status(500).json({ message: "Failed to move mail" });
   }
 };

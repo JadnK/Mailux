@@ -221,6 +221,23 @@ export const markAsRead = async (
   }
 };
 
+export const markAsUnread = async (
+  username: string,
+  password: string,
+  mailbox: string,
+  mailUid: number
+): Promise<void> => {
+  const imapConfig = getImapConfig(username, password);
+  const connection = await imaps.connect(imapConfig);
+
+  try {
+    await connection.openBox(mailbox);
+    await connection.delFlags(mailUid, "\\Seen");
+  } finally {
+    connection.end();
+  }
+};
+
 async function moveToTrash(connection: Connection, mailUid: number): Promise<void> {
   try {
     await connection.moveMessage(mailUid, TRASH_MAILBOX);
@@ -276,6 +293,99 @@ export const deleteMail = async (
       await connection.deleteMessage(mailUid);
       return { movedToTrash: false };
     }
+  } finally {
+    connection.end();
+  }
+};
+
+export type MailFolder = {
+  /** Full IMAP mailbox path, e.g. "Projects/Website" for a nested folder. */
+  name: string;
+  delimiter: string;
+};
+
+/**
+ * Lists every mailbox on the account - the six standard ones plus any
+ * custom folders the user created (through Mailux or another IMAP
+ * client). Folders marked \Noselect (pure containers used only to group
+ * child folders) are left out, since they can't hold messages.
+ */
+export const listFolders = async (username: string, password: string): Promise<MailFolder[]> => {
+  const imapConfig = getImapConfig(username, password);
+  const connection = await imaps.connect(imapConfig);
+
+  try {
+    const boxes = await connection.getBoxes();
+    const folders: MailFolder[] = [];
+
+    const walk = (tree: Record<string, any>, prefix: string) => {
+      for (const [name, node] of Object.entries(tree)) {
+        const delimiter: string = node?.delimiter || "/";
+        const fullName = prefix ? `${prefix}${delimiter}${name}` : name;
+        const attribs: string[] = node?.attribs ?? [];
+
+        if (!attribs.includes("\\Noselect")) {
+          folders.push({ name: fullName, delimiter });
+        }
+
+        if (node?.children) {
+          walk(node.children, fullName);
+        }
+      }
+    };
+
+    walk(boxes, "");
+    return folders;
+  } finally {
+    connection.end();
+  }
+};
+
+// Folder names are kept simple on purpose: no IMAP delimiter characters
+// (so a single addBox call can't accidentally create nested folders the
+// user didn't ask for), no leading/trailing whitespace, nothing exotic.
+const FOLDER_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,63}$/;
+
+export const createFolder = async (
+  username: string,
+  password: string,
+  name: string
+): Promise<void> => {
+  const trimmed = name.trim();
+
+  if (!FOLDER_NAME_PATTERN.test(trimmed)) {
+    throw new Error(
+      "Folder names may only contain letters, numbers, spaces, - and _, and must be 1-64 characters"
+    );
+  }
+
+  if (STANDARD_MAILBOXES.has(trimmed)) {
+    throw new Error("A folder with that name already exists");
+  }
+
+  const imapConfig = getImapConfig(username, password);
+  const connection = await imaps.connect(imapConfig);
+
+  try {
+    await connection.addBox(trimmed);
+  } finally {
+    connection.end();
+  }
+};
+
+export const moveMail = async (
+  username: string,
+  password: string,
+  fromMailbox: string,
+  mailUid: number,
+  toMailbox: string
+): Promise<void> => {
+  const imapConfig = getImapConfig(username, password);
+  const connection = await imaps.connect(imapConfig);
+
+  try {
+    await connection.openBox(fromMailbox);
+    await connection.moveMessage(mailUid, toMailbox);
   } finally {
     connection.end();
   }
