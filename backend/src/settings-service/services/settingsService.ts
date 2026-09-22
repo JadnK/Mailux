@@ -1,16 +1,17 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const CONFIG_PATH = path.join(__dirname, '../../../config.json');
+// Runtime data file - intentionally gitignored, recreated on first run.
+const CONFIG_PATH = path.join(__dirname, "../../../config.json");
 
 interface UserSettings {
   name: string;
   signature: string;
-  canReceiveMails: boolean;
+  canReceiveMail: boolean;
   vacationMode: boolean;
   vacationMessage?: string;
 }
@@ -20,39 +21,31 @@ interface GlobalSettings {
   maxStorageMB: number;
 }
 
-interface UserOverrides {
-  [username: string]: Partial<GlobalSettings>;
-}
-
 interface ConfigData {
   globalSettings: GlobalSettings;
   userSettings: { [username: string]: UserSettings };
 }
 
+const DEFAULT_CONFIG: ConfigData = {
+  globalSettings: {
+    defaultSignature: "Sent with Mailux",
+    maxStorageMB: 1024,
+  },
+  userSettings: {},
+};
+
 function loadConfig(): ConfigData {
   try {
     if (!fs.existsSync(CONFIG_PATH)) {
-      const defaultConfig: ConfigData = {
-        globalSettings: {
-          defaultSignature: "Sent with Mailux",
-          maxStorageMB: 1024,
-        },
-        userSettings: {}
-      };
-      fs.writeFileSync(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2));
-      return defaultConfig;
+      fs.writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 2));
+      return structuredClone(DEFAULT_CONFIG);
     }
-    const data = fs.readFileSync(CONFIG_PATH, 'utf8');
-    return JSON.parse(data);
+
+    const data = fs.readFileSync(CONFIG_PATH, "utf8");
+    return JSON.parse(data) as ConfigData;
   } catch (error) {
-    console.error('Error loading config:', error);
-    return {
-      globalSettings: {
-        defaultSignature: "Sent with Mailux",
-        maxStorageMB: 1024,
-      },
-      userSettings: {}
-    };
+    console.error("Error loading config:", error);
+    return structuredClone(DEFAULT_CONFIG);
   }
 }
 
@@ -60,19 +53,23 @@ function saveConfig(config: ConfigData): void {
   try {
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
   } catch (error) {
-    console.error('Error saving config:', error);
+    console.error("Error saving config:", error);
     throw error;
   }
 }
 
-let globalSettings: GlobalSettings = loadConfig().globalSettings;
-let userSettings: { [username: string]: UserSettings } = loadConfig().userSettings;
-
-const userOverrides: UserOverrides = {};
+function defaultUserSettings(username: string, globalSettings: GlobalSettings): UserSettings {
+  return {
+    name: username,
+    signature: globalSettings.defaultSignature,
+    canReceiveMail: true,
+    vacationMode: false,
+    vacationMessage: "",
+  };
+}
 
 export const getGlobalSettings = (): GlobalSettings => {
-  const config = loadConfig();
-  return config.globalSettings;
+  return loadConfig().globalSettings;
 };
 
 export const updateGlobalSettings = (updates: Partial<GlobalSettings>): GlobalSettings => {
@@ -84,31 +81,26 @@ export const updateGlobalSettings = (updates: Partial<GlobalSettings>): GlobalSe
 
 export const getUserSettings = (username: string): UserSettings => {
   const config = loadConfig();
+
   if (!config.userSettings[username]) {
-    config.userSettings[username] = {
-      name: username,
-      signature: config.globalSettings.defaultSignature,
-      canReceiveMails: true,
-      vacationMode: false,
-      vacationMessage: ""
-    };
+    config.userSettings[username] = defaultUserSettings(username, config.globalSettings);
     saveConfig(config);
   }
+
   return config.userSettings[username];
 };
 
-export const updateUserSettings = (username: string, updates: Partial<UserSettings>): UserSettings => {
+export const updateUserSettings = (
+  username: string,
+  updates: Partial<UserSettings>
+): UserSettings => {
   const config = loadConfig();
-  if (!config.userSettings[username]) {
-    config.userSettings[username] = {
-      name: username,
-      signature: config.globalSettings.defaultSignature,
-      canReceiveMails: true,
-      vacationMode: false,
-      vacationMessage: ""
-    };
-  }
-  config.userSettings[username] = { ...config.userSettings[username], ...updates };
+
+  config.userSettings[username] = {
+    ...(config.userSettings[username] ?? defaultUserSettings(username, config.globalSettings)),
+    ...updates,
+  };
+
   saveConfig(config);
   return config.userSettings[username];
 };

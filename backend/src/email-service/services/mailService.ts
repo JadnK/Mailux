@@ -3,20 +3,20 @@ import imaps from "imap-simple";
 import { simpleParser } from "mailparser";
 import { getImapConfig } from "../config/imap.js";
 import { MailData } from "../types/mail.js";
+import { env } from "../../config/env.js";
 import { getUserSettings } from "../../settings-service/services/settingsService.js";
 import { createRequire } from "module";
+
 const require = createRequire(import.meta.url);
 const MailComposer = require("nodemailer/lib/mail-composer");
 
-
 export const sendMail = async (mailData: MailData, username: string, password: string) => {
-  try {
-    const transporter = getMailTransporter(username, password);
-    const userSettings = getUserSettings(username);
-    
-    const defaultEmail = `${username}@jadenk.de`;
-    const displayName = userSettings.name || username;
-    const formattedFrom = `"${displayName}" <${defaultEmail}>`;
+  const transporter = getMailTransporter(username, password);
+  const userSettings = getUserSettings(username);
+
+  const defaultEmail = `${username}@${env.mailDomain}`;
+  const displayName = userSettings.name || username;
+  const formattedFrom = `"${displayName}" <${defaultEmail}>`;
 
   const finalMailData: MailData = {
     ...mailData,
@@ -29,24 +29,13 @@ export const sendMail = async (mailData: MailData, username: string, password: s
     },
   };
 
-    await transporter.verify();
+  await transporter.verify();
+  const info = await transporter.sendMail(finalMailData);
 
-    const info = await transporter.sendMail(finalMailData);
-    /*console.log("=== SEND INFO ===");
-    console.log("messageId:", info.messageId);
-    console.log("accepted:", info.accepted);
-    console.log("rejected:", info.rejected);
-    console.log("response:", info.response);
-    console.log("envelope:", info.envelope);
-    console.log("=== END SEND INFO ===");*/
-
-    await saveToSent(finalMailData, username, password);
-    return info;
-  } catch (err) {
-    console.error("Error sending mail:", err);
-    throw err;
-  }
+  await saveToSent(finalMailData, username, password);
+  return info;
 };
+
 export const saveToSent = async (mailData: MailData, username: string, password: string) => {
   const imapConfig = getImapConfig(username, password);
   const connection = await imaps.connect(imapConfig);
@@ -61,64 +50,14 @@ export const saveToSent = async (mailData: MailData, username: string, password:
   }
 };
 
-
-export const getInbox = async (username: string, password: string) => {
-  const imapConfig = getImapConfig(username, password);
-  const connection = await imaps.connect(imapConfig);
-  await connection.openBox("INBOX");
-
-  const searchCriteria = ["ALL"];
-  const fetchOptions = { bodies: [""], struct: true };
-  const messages = await connection.search(searchCriteria, fetchOptions);
-
-  const mails = await Promise.all(
-    messages.map(async (msg: any) => {
-      const allParts = msg.parts.find((p: any) => p.which === "");
-      const parsed = await simpleParser(allParts.body);
-      
-      const mailData = {
-        uid: msg.attributes.uid, // Add UID for deletion
-        from: parsed.from?.text || "",
-        to: parsed.to?.text || "",
-        subject: parsed.subject || "",
-        date: parsed.date?.toString() || "",
-        text: parsed.text || "",
-        html: parsed.html || "",
-      };
-    
-      
-      return mailData;
-    })
-  );
-
-  connection.end();
-  
-  return mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-};
-
-export const getSent = async (username: string, password: string) => {
+async function fetchMailbox(username: string, password: string, mailbox: string) {
   const imapConfig = getImapConfig(username, password);
   const connection = await imaps.connect(imapConfig);
 
   try {
-    console.log("Trying to open Sent mailbox for", username);
+    await connection.openBox(mailbox);
 
-    try {
-      await connection.openBox("Sent");
-      console.log('Successfully opened "Sent"');
-    } catch (err) {
-      console.error('openBox("Sent") failed:', err);
-
-      const boxes = await connection.getBoxes();
-      console.dir(boxes, { depth: 10 });
-
-      throw err;
-    }
-
-    const messages = await connection.search(["ALL"], {
-      bodies: [""],
-      struct: true,
-    });
+    const messages = await connection.search(["ALL"], { bodies: [""], struct: true });
 
     const mails = await Promise.all(
       messages.map(async (msg: any) => {
@@ -137,19 +76,25 @@ export const getSent = async (username: string, password: string) => {
       })
     );
 
-    return mails.sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    return mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   } finally {
     await connection.end();
   }
+}
+
+export const getInbox = async (username: string, password: string) => {
+  return fetchMailbox(username, password, "INBOX");
+};
+
+export const getSent = async (username: string, password: string) => {
+  return fetchMailbox(username, password, "Sent");
 };
 
 export const replyMail = async (mailData: MailData, username: string, password: string) => {
-  return await sendMail(mailData, username, password);
+  return sendMail(mailData, username, password);
 };
 
-let folders: Record<string, string[]> = {};
+const folders: Record<string, string[]> = {};
 
 export const createFolder = (username: string, folderName: string) => {
   if (!folders[username]) folders[username] = [];
@@ -161,21 +106,20 @@ export const getFolders = (username: string) => {
   return folders[username] || [];
 };
 
-export const deleteMail = async (username: string, password: string, mailbox: string, mailUid: number) => {
+export const deleteMail = async (
+  username: string,
+  password: string,
+  mailbox: string,
+  mailUid: number
+) => {
   const imapConfig = getImapConfig(username, password);
   const connection = await imaps.connect(imapConfig);
-  
+
   try {
     await connection.openBox(mailbox);
-    
-    await connection.addFlags(mailUid, ['\\Deleted']);
-    
+    await connection.addFlags(mailUid, ["\\Deleted"]);
     await connection.imap.expunge();
-    
     return true;
-  } catch (error) {
-    console.error('Error deleting mail:', error);
-    throw error;
   } finally {
     await connection.end();
   }
