@@ -16,9 +16,9 @@
 ## What it is
 
 Mailux turns a plain Postfix + Dovecot mail server into something you can
-actually manage from a browser: a clean three-pane inbox, sending mail,
-and - for the `root` account - creating and removing mailboxes, without
-ever touching SSH.
+actually manage from a browser: a clean, dark, three-pane inbox with all
+your real IMAP folders, attachments, CC/BCC, and - for the `root` account
+only - creating and removing mailboxes, all without ever touching SSH.
 
 Mailboxes **are** Linux system accounts. There's no separate user database:
 Mailux authenticates against PAM, reads `/etc/passwd` to find accounts with
@@ -29,12 +29,19 @@ it's deployed).
 
 ## Features
 
-- **Inbox / Sent** - reads mail over IMAP, sends over SMTP, saves a copy to
-  `Sent` automatically
-- **Compose & reply** - with sender name/signature pulled from per-user
-  settings
-- **User management** (root only) - create a mailbox (system user + Maildir
-  + password) or remove one, from the UI
+- **Real folders** - Inbox, Sent, Drafts, Archive, Spam and Trash are read
+  straight from IMAP, not hardcoded; a folder that doesn't exist yet on an
+  account shows an honest empty state instead of an error
+- **Attachments** - drag-and-drop or pick files onto a new message, and
+  download attachments straight from a received mail
+- **Compose & reply** - with Cc/Bcc, and sender name/signature pulled from
+  per-user settings
+- **Delete = move to Trash** - available to every logged-in user for their
+  own mail (not just root); deleting from Trash itself is permanent, same
+  as any other mail client
+- **User management** (root only) - creating and removing mailboxes (system
+  user + Maildir + password) is the one thing kept root-only; everything
+  else in the UI works the same for every account
 - **Session-based auth** - PAM login issues a short opaque session token;
   your mail password never sits in browser storage in plaintext (see
   [`docs/SECURITY.md`](docs/SECURITY.md))
@@ -97,9 +104,15 @@ This installs two systemd services (`deploy/systemd/`):
 - **`mailux-frontend`** - static build served by [`serve`](https://github.com/vercel/serve),
   runs as an unprivileged `mailux-web` user, bound to `127.0.0.1:4173`
 
-Put a reverse proxy in front of both for TLS. No Docker is involved -
-Mailux needs direct access to `/etc/passwd`, PAM, and system Maildirs,
-which containers make more awkward, not less.
+Put a reverse proxy (nginx, Caddy, **Nginx Proxy Manager**, ...) in front of
+both, on one hostname, with the backend mounted under `/api` - the frontend
+calls a relative `/api/...` path, so it only works when both are served
+from the same origin. Step-by-step instructions for Nginx Proxy Manager,
+plain nginx and Caddy are in
+[Reverse proxy / HTTPS for the web UI](docs/DEPLOYMENT.md#reverse-proxy--https-for-the-web-ui).
+
+No Docker is involved - Mailux needs direct access to `/etc/passwd`, PAM,
+and system Maildirs, which containers make more awkward, not less.
 
 ## Project layout
 

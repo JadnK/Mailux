@@ -272,14 +272,111 @@ sudo systemctl restart mailux-backend mailux-frontend
 
 ## Reverse proxy / HTTPS for the web UI
 
-Point a reverse proxy (nginx, Caddy, Nginx Proxy Manager, ...) at:
+The frontend talks to the backend over a **relative** path (`/api/...`),
+not a hardcoded host - see [`frontend/src/api/mailClient.ts`](../frontend/src/api/mailClient.ts).
+That's what makes Mailux work when you open it from any machine over the
+web, not just from the server itself - but it also means the frontend and
+backend **must be served from the same origin** (same domain, from the
+browser's point of view). A reverse proxy is what makes that true: it puts
+the static frontend (port 4173) and the API (port 5000, which already
+mounts all of its routes under `/api` - see `backend/src/app.ts`) behind
+one public hostname.
 
-- frontend: `http://127.0.0.1:4173`
-- backend: `http://127.0.0.1:5000` (mount under `/api`, or set
-  `VITE_API_BASE_URL` at frontend build time to point at wherever you
-  expose it)
+> If you skip this and open the frontend without a proxy in front of it (or
+> point it straight at a different host/port than the backend), login will
+> fail - the browser tries to reach `/api/login` on whatever origin served
+> the page, and nothing is listening there. This is the exact issue behind
+> the old hardcoded `http://localhost:5000/api` default, which only ever
+> worked when the browser and backend were on the same machine.
 
-Terminate TLS at the proxy (Let's Encrypt) and force HTTPS.
+### Option A: Nginx Proxy Manager
+
+1. **Proxy Host** for your domain (e.g. `mail.example.com`):
+   - Scheme `http`, Forward Hostname/IP `127.0.0.1`, Forward Port `4173`
+     (the frontend)
+   - SSL tab: request a Let's Encrypt certificate, enable **Force SSL** and
+     **HTTP/2 Support**
+2. On that same Proxy Host, open **Custom Locations** and add one:
+   - Location: `/api`
+   - Scheme `http`, Forward Hostname/IP `127.0.0.1`, Forward Port `5000`
+     (the backend)
+   - Don't add anything after the port and don't enable a "strip prefix"
+     option - Nginx Proxy Manager forwards the full request path (including
+     `/api`) to the backend unchanged, and the backend already expects
+     requests under `/api` (it mounts its own routes there), so no
+     rewriting is needed on either side.
+3. Save. `https://mail.example.com/` now serves the frontend, and
+   `https://mail.example.com/api/...` is proxied straight to the backend -
+   exactly what `mailClient.ts`'s relative `/api` base URL expects.
+
+`CORS_ORIGIN` in `/etc/mailux/backend.env` doesn't matter for this setup -
+the browser only ever talks to one origin, so no CORS headers are needed at
+all.
+
+### Option B: plain nginx
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name mail.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/mail.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mail.example.com/privkey.pem;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:4173;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+
+server {
+    listen 80;
+    server_name mail.example.com;
+    return 301 https://$host$request_uri;
+}
+```
+
+Note there is **no path after the port** in `proxy_pass http://127.0.0.1:5000;`.
+That's deliberate: with no URI part, nginx forwards the request path
+unchanged, so `/api/login` reaches the backend as `/api/login`. Writing
+`proxy_pass http://127.0.0.1:5000/;` (trailing slash) would strip the
+`/api` prefix and break every request.
+
+### Option C: Caddy
+
+```
+mail.example.com {
+    handle /api/* {
+        reverse_proxy 127.0.0.1:5000
+    }
+    handle {
+        reverse_proxy 127.0.0.1:4173
+    }
+}
+```
+
+Caddy provisions the Let's Encrypt certificate automatically.
+
+### Running frontend and backend on different origins (not recommended)
+
+If you really don't want a reverse proxy in front of both, you can serve
+the frontend and backend from different hosts/ports. Set
+`VITE_API_BASE_URL` to the backend's full URL (e.g.
+`https://api.example.com`) at frontend **build** time, and set
+`CORS_ORIGIN` in the backend's env to the frontend's exact origin. This
+works, but you now have two origins, a manual CORS allowlist, and two
+certificates to keep in sync - the same-origin reverse proxy setup above is
+simpler and is what the rest of this guide assumes.
 
 ## Operating it
 
@@ -299,6 +396,14 @@ postqueue -f
 ```
 
 ## Troubleshooting
+
+**Login works on `localhost` but fails ("Failed to fetch" / network error)
+over the web**
+The frontend and backend aren't being served from the same origin. See
+[Reverse proxy / HTTPS for the web UI](#reverse-proxy--https-for-the-web-ui)
+above - you need a proxy that serves the frontend at `/` and the backend at
+`/api` under one hostname, unless you've deliberately set
+`VITE_API_BASE_URL` and `CORS_ORIGIN` for a cross-origin setup.
 
 **"Authentication failed" logging into Mailux**
 Confirm PAM sees the account: `doveadm auth test <user> '<password>'`.
