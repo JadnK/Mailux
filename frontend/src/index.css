@@ -1057,6 +1057,22 @@ textarea {
   box-shadow: var(--shadow-glow);
 }
 
+/* The actual "new message" / reply-in-a-modal window (as opposed to the
+ * same .compose-window styling reused for the admin "create user" card):
+ * noticeably roomier, Gmail-sized rather than a small box lost in the
+ * middle of the screen, and its body claims the full height budget (not
+ * just whatever its content needs) so the white writing area is large by
+ * default. */
+.compose-window.compose-window--message {
+  width: min(760px, calc(100vw - 64px));
+  height: min(700px, calc(100vh - 64px));
+  max-height: min(700px, calc(100vh - 64px));
+}
+.compose-window.compose-window--message .compose-body {
+  flex: 1;
+  min-height: 0;
+}
+
 @keyframes compose-overlay-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -1166,8 +1182,8 @@ textarea {
 .inline-reply .compose-body {
   padding: 14px 16px;
 }
-.inline-reply textarea {
-  min-height: 120px;
+.inline-reply .rich-text-body {
+  min-height: 130px;
 }
 
 .inline-reply > footer {
@@ -1177,6 +1193,100 @@ textarea {
   padding: 12px 16px;
   border-top: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.15);
+}
+
+/* ============ rich text editor (compose body) ============ */
+/* The chrome (toolbar) stays dark like the rest of the app; the actual
+ * writing surface is white, like real email content (the same choice
+ * .message-body iframe already makes for HTML mail you receive) - so
+ * what you're writing looks like what it'll actually look like sent. */
+
+.rich-text-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.rich-text-editor:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.rich-text-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.rich-text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.rich-text-button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.rich-text-italic {
+  font-style: italic;
+}
+.rich-text-underline {
+  text-decoration: underline;
+}
+
+.rich-text-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--border-strong);
+}
+
+.rich-text-body {
+  flex: 1;
+  min-height: 160px;
+  overflow-y: auto;
+  padding: 14px 16px;
+  color: #1c2230;
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  line-height: 1.6;
+  outline: none;
+}
+.rich-text-body:empty::before {
+  content: attr(data-placeholder);
+  color: #8c8f98;
+}
+.rich-text-body a {
+  color: #2454ff;
+}
+.rich-text-body ul,
+.rich-text-body ol {
+  margin: 0 0 0 1.2em;
+  padding: 0;
+}
+
+.compose-window.compose-window--message .rich-text-body {
+  min-height: 220px;
 }
 
 /* ============ settings (own profile + site-wide) ============ */

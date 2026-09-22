@@ -1,5 +1,6 @@
 import type { DragEvent, FormEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RichTextEditor } from "./RichTextEditor";
 import { SettingsPanel } from "./SettingsPanel";
 import {
   deleteMail,
@@ -10,6 +11,7 @@ import {
   sendMail,
 } from "../api/mailClient";
 import type { ComposePayload, FolderItem, Mail, Session, UserSettings } from "../types/mail";
+import { htmlToText, textToHtml } from "../utils/richText";
 import { initialsOf } from "../utils/text";
 
 const SYSTEM_FOLDERS: FolderItem[] = [
@@ -140,6 +142,7 @@ const EMPTY_COMPOSE: ComposePayload = {
   bcc: "",
   subject: "",
   text: "",
+  html: "",
   attachments: [],
 };
 
@@ -184,6 +187,15 @@ export function MailShell({ session, onLogout }: MailShellProps) {
 
   const selectedMail =
     visibleMails.find((mail) => String(mail.uid) === String(selectedUid)) ?? visibleMails[0];
+
+  // A fresh compose/reply session is seeded with two blank lines followed
+  // by the user's signature, so it's visible and editable right there in
+  // the body (not a separate, hidden field) - the cursor is placed above
+  // it by RichTextEditor itself.
+  const draftHtml = useCallback((): string => {
+    if (!mySettings?.signature) return "<br><br>";
+    return `<br><br>${textToHtml(mySettings.signature)}`;
+  }, [mySettings?.signature]);
 
   async function loadFolder(folder = activeFolder) {
     setIsLoading(true);
@@ -269,8 +281,9 @@ export function MailShell({ session, onLogout }: MailShellProps) {
 
       if (event.key === "c") {
         event.preventDefault();
-        setCompose(EMPTY_COMPOSE);
+        setCompose({ ...EMPTY_COMPOSE, html: draftHtml() });
         setShowCcBcc(false);
+        setReplyOpen(false);
         setComposeOpen(true);
       } else if (event.key === "/") {
         event.preventDefault();
@@ -280,7 +293,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [composeOpen]);
+  }, [composeOpen, draftHtml]);
 
   async function switchFolder(folder: FolderItem) {
     setActiveView("mail");
@@ -347,10 +360,18 @@ export function MailShell({ session, onLogout }: MailShellProps) {
     event.preventDefault();
     setError("");
     setNotice("");
+
+    const html = compose.html ?? "";
+    const text = htmlToText(html);
+    if (!text) {
+      setError("Nachricht darf nicht leer sein");
+      return;
+    }
+
     setIsSending(true);
 
     try {
-      await sendMail(session, compose);
+      await sendMail(session, { ...compose, text, html });
       setCompose(EMPTY_COMPOSE);
       setShowCcBcc(false);
       setComposeOpen(false);
@@ -375,6 +396,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
       bcc: "",
       subject: mail.subject?.startsWith("Re:") ? mail.subject : `Re: ${mail.subject || ""}`,
       text: "",
+      html: draftHtml(),
       attachments: [],
     });
     setShowCcBcc(false);
@@ -415,7 +437,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
         <button
           className="compose-button"
           onClick={() => {
-            setCompose(EMPTY_COMPOSE);
+            setCompose({ ...EMPTY_COMPOSE, html: draftHtml() });
             setShowCcBcc(false);
             setReplyOpen(false);
             setComposeOpen(true);
@@ -679,14 +701,10 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                       </button>
                     </header>
                     <div className="compose-body">
-                      <textarea
-                        value={compose.text}
-                        onChange={(event) => setCompose({ ...compose, text: event.target.value })}
+                      <RichTextEditor
+                        initialHtml={compose.html}
+                        onChange={(html) => setCompose((prev) => ({ ...prev, html }))}
                         placeholder="Antwort schreiben…"
-                        aria-label="Antwort"
-                        rows={6}
-                        autoFocus
-                        required
                       />
                     </div>
                     <footer>
@@ -724,7 +742,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           }}
         >
           <form
-            className={`compose-window ${isDroppingFile ? "dropping" : ""}`}
+            className={`compose-window compose-window--message ${isDroppingFile ? "dropping" : ""}`}
             onSubmit={handleSend}
             onDragOver={(event) => {
               event.preventDefault();
@@ -787,12 +805,10 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                 placeholder="Betreff"
                 aria-label="Betreff"
               />
-              <textarea
-                value={compose.text}
-                onChange={(event) => setCompose({ ...compose, text: event.target.value })}
+              <RichTextEditor
+                initialHtml={compose.html}
+                onChange={(html) => setCompose((prev) => ({ ...prev, html }))}
                 placeholder="Nachricht schreiben… (Dateien lassen sich auch hierher ziehen)"
-                aria-label="Nachricht"
-                required
               />
 
               {(compose.attachments ?? []).length > 0 && (

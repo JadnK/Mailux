@@ -35,8 +35,10 @@ it's deployed).
   "folder doesn't exist"
 - **Attachments** - drag-and-drop or pick files onto a new message, and
   download attachments straight from a received mail
-- **Compose & reply** - with Cc/Bcc, and sender name/signature pulled from
-  per-user settings
+- **Compose & reply** - Gmail-style inline reply under the open message
+  (not a modal that hides it), a rich text editor (bold/italic/underline/
+  strikethrough/lists) for the mail body, and every new draft is seeded
+  with your signature, editable right there in the body
 - **Delete = move to Trash** - available to every logged-in user for their
   own mail (not just root); deleting from Trash itself is permanent, same
   as any other mail client
