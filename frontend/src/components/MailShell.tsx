@@ -3,14 +3,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RichTextEditor } from "./RichTextEditor";
 import { SettingsPanel } from "./SettingsPanel";
 import {
+  createFolder,
   deleteMail,
   downloadAttachment,
   getMailbox,
   getMySettings,
+  listFolders,
   markAsRead,
+  markAsUnread,
+  moveMail,
   sendMail,
 } from "../api/mailClient";
-import type { ComposePayload, FolderItem, Mail, Session, UserSettings } from "../types/mail";
+import type { ComposePayload, FolderItem, Mail, MailFolder, Session, UserSettings } from "../types/mail";
 import { htmlToText, textToHtml } from "../utils/richText";
 import { initialsOf } from "../utils/text";
 
@@ -22,6 +26,8 @@ const SYSTEM_FOLDERS: FolderItem[] = [
   { id: "Spam", label: "Spam", mailbox: "Spam", system: true },
   { id: "Trash", label: "Papierkorb", mailbox: "Trash", system: true, destructive: true },
 ];
+
+const STANDARD_MAILBOX_NAMES = new Set(SYSTEM_FOLDERS.map((folder) => folder.mailbox));
 
 const FOLDER_ICONS: Record<string, string> = {
   INBOX:
@@ -123,6 +129,7 @@ function wrapMailHtml(html: string): string {
     img { max-width: 100%; height: auto; }
     a { color: #2454ff; }
     table { max-width: 100%; }
+    ::selection { background: rgba(37, 99, 235, 0.28); }
   </style>`;
 
   if (/<head[^>]*>/i.test(html)) {
@@ -146,6 +153,96 @@ const EMPTY_COMPOSE: ComposePayload = {
   attachments: [],
 };
 
+/**
+ * Renders a received message's HTML in a sandboxed iframe, sized to fit
+ * its actual content instead of a fixed height - so long emails aren't
+ * squeezed into a small "window within a window" with its own nested
+ * scrollbar. `.message-body` (the ancestor) is the only scroll region.
+ *
+ * `allow-same-origin` (with no `allow-scripts`, `allow-forms`, etc.) is
+ * what makes measuring the content possible at all: without it the iframe
+ * gets an opaque cross-origin document and `contentDocument` throws. The
+ * mail HTML still can't execute any script or navigate anywhere - it's
+ * just no longer treated as cross-origin for the purpose of reading its
+ * rendered height.
+ */
+function MailIframe({ html }: { html: string }) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    let observer: ResizeObserver | undefined;
+    let cancelled = false;
+
+    function resize() {
+      if (cancelled) return;
+      const frame = iframeRef.current;
+      if (!frame) return;
+
+      try {
+        const doc = frame.contentDocument;
+        if (!doc) return;
+        const height = Math.max(
+          doc.documentElement?.scrollHeight ?? 0,
+          doc.body?.scrollHeight ?? 0
+        );
+        if (height > 0) frame.style.height = `${height}px`;
+      } catch {
+        // Not reachable for some reason - the CSS min-height fallback
+        // still applies, it's just no longer content-fitted.
+      }
+    }
+
+    function handleLoad() {
+      resize();
+
+      try {
+        const frame = iframeRef.current;
+        const doc = frame?.contentDocument;
+        if (!doc) return;
+
+        // Images (and webfonts) can keep loading after the iframe's own
+        // load event fires, silently growing the content after we already
+        // measured it once - catch those too.
+        Array.from(doc.images).forEach((img) => {
+          if (!img.complete) img.addEventListener("load", resize, { once: true });
+        });
+
+        if ("ResizeObserver" in window) {
+          observer = new ResizeObserver(resize);
+          observer.observe(doc.documentElement);
+        }
+      } catch {
+        // Cross-origin or otherwise unreachable.
+      }
+    }
+
+    iframe.addEventListener("load", handleLoad);
+    return () => {
+      cancelled = true;
+      iframe.removeEventListener("load", handleLoad);
+      observer?.disconnect();
+    };
+  }, [html]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      title="Nachricht"
+      sandbox="allow-same-origin"
+      srcDoc={wrapMailHtml(html)}
+    />
+  );
+}
+
+type ContextMenuState = {
+  x: number;
+  y: number;
+  mail: Mail;
+};
+
 export function MailShell({ session, onLogout }: MailShellProps) {
   const [activeFolder, setActiveFolder] = useState<FolderItem>(SYSTEM_FOLDERS[0]);
   const [activeView, setActiveView] = useState<"mail" | "settings">("mail");
@@ -167,10 +264,35 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [customFolders, setCustomFolders] = useState<MailFolder[]>([]);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [folderError, setFolderError] = useState("");
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [dragOverMailbox, setDragOverMailbox] = useState<string | null>(null);
+
   const displayName = mySettings?.name || session.username;
   const accountInitials = useMemo(() => initialsOf(displayName), [displayName]);
   const isTrash = activeFolder.mailbox === "Trash";
   const unreadCount = useMemo(() => mails.filter((mail) => !mail.seen).length, [mails]);
+
+  // Custom (user-created) folders, as FolderItems so they render through
+  // the exact same sidebar/list code path as the six standard ones -
+  // filtering out anything that happens to share a name with a standard
+  // mailbox (defensive; the backend already refuses to create one).
+  const customFolderItems = useMemo<FolderItem[]>(
+    () =>
+      customFolders
+        .filter((folder) => !STANDARD_MAILBOX_NAMES.has(folder.name))
+        .map((folder) => ({ id: folder.name, label: folder.name, mailbox: folder.name })),
+    [customFolders]
+  );
+
+  const allFolders = useMemo(
+    () => [...SYSTEM_FOLDERS, ...customFolderItems],
+    [customFolderItems]
+  );
 
   const visibleMails = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -197,6 +319,17 @@ export function MailShell({ session, onLogout }: MailShellProps) {
     return `<br><br>${textToHtml(mySettings.signature)}`;
   }, [mySettings?.signature]);
 
+  async function loadFolders() {
+    try {
+      const folders = await listFolders(session);
+      setCustomFolders(folders);
+    } catch {
+      // Non-fatal - the sidebar just falls back to the six standard
+      // folders until this can be retried (e.g. by creating a folder,
+      // which refreshes the list itself).
+    }
+  }
+
   async function loadFolder(folder = activeFolder) {
     setIsLoading(true);
     setError("");
@@ -219,6 +352,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
 
   useEffect(() => {
     loadFolder(SYSTEM_FOLDERS[0]);
+    loadFolders();
     getMySettings(session)
       .then(setMySettings)
       .catch(() => {
@@ -227,6 +361,28 @@ export function MailShell({ session, onLogout }: MailShellProps) {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Closes the right-click context menu on any click elsewhere, or Escape -
+  // the standard behavior for this kind of menu.
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    function handleClick() {
+      setContextMenu(null);
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setContextMenu(null);
+    }
+
+    window.addEventListener("click", handleClick);
+    window.addEventListener("contextmenu", handleClick);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("click", handleClick);
+      window.removeEventListener("contextmenu", handleClick);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contextMenu]);
 
   // Compose modal: Escape closes it, and the page behind it stops
   // scrolling while it's open so it can never visually bleed into the
@@ -331,6 +487,62 @@ export function MailShell({ session, onLogout }: MailShellProps) {
       await loadFolder(activeFolder);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+    }
+  }
+
+  async function handleCreateFolder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = newFolderName.trim();
+    if (!name) return;
+
+    setFolderError("");
+    setIsCreatingFolder(true);
+
+    try {
+      await createFolder(session, name);
+      await loadFolders();
+      setNewFolderName("");
+      setNewFolderOpen(false);
+    } catch (err) {
+      setFolderError(err instanceof Error ? err.message : "Ordner konnte nicht erstellt werden");
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  }
+
+  // Moves a mail into another folder - used by both the right-click
+  // context menu and dragging a message row onto a sidebar folder.
+  async function handleMoveMail(mail: Mail, targetMailbox: string) {
+    if (targetMailbox === activeFolder.mailbox) return;
+
+    setContextMenu(null);
+    const previousMails = mails;
+    setMails((prev) => prev.filter((m) => String(m.uid) !== String(mail.uid)));
+
+    try {
+      await moveMail(session, activeFolder.mailbox, mail.uid, targetMailbox);
+      setNotice(`Nach "${targetMailbox}" verschoben.`);
+      if (String(selectedUid) === String(mail.uid)) setSelectedUid(null);
+    } catch (err) {
+      setMails(previousMails);
+      setError(err instanceof Error ? err.message : "Verschieben fehlgeschlagen");
+    }
+  }
+
+  async function handleToggleRead(mail: Mail) {
+    setContextMenu(null);
+    const nextSeen = !mail.seen;
+    setMails((prev) => prev.map((m) => (m.uid === mail.uid ? { ...m, seen: nextSeen } : m)));
+
+    try {
+      if (nextSeen) {
+        await markAsRead(session, activeFolder.mailbox, mail.uid);
+      } else {
+        await markAsUnread(session, activeFolder.mailbox, mail.uid);
+      }
+    } catch {
+      // Non-fatal - worst case it reverts to its previous state on the
+      // next reload.
     }
   }
 
@@ -462,14 +674,28 @@ export function MailShell({ session, onLogout }: MailShellProps) {
         </button>
 
         <nav className="folder-list" aria-label="Mail folders">
-          {SYSTEM_FOLDERS.map((folder) => {
+          {allFolders.map((folder) => {
             const isActive = activeView === "mail" && activeFolder.mailbox === folder.mailbox;
             const badgeCount = folder.mailbox === "INBOX" && activeFolder.mailbox === "INBOX" ? unreadCount : 0;
+            const isDropTarget = dragOverMailbox === folder.mailbox && folder.mailbox !== activeFolder.mailbox;
             return (
               <button
                 key={folder.mailbox}
-                className={`folder-button ${isActive ? "active" : ""} ${folder.destructive ? "danger-folder" : ""}`}
+                className={`folder-button ${isActive ? "active" : ""} ${folder.destructive ? "danger-folder" : ""} ${isDropTarget ? "drop-target" : ""}`}
                 onClick={() => switchFolder(folder)}
+                onDragOver={(event) => {
+                  if (folder.mailbox === activeFolder.mailbox) return;
+                  event.preventDefault();
+                  setDragOverMailbox(folder.mailbox);
+                }}
+                onDragLeave={() => setDragOverMailbox((prev) => (prev === folder.mailbox ? null : prev))}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragOverMailbox(null);
+                  const uid = event.dataTransfer.getData("text/mailux-uid");
+                  const mail = mails.find((m) => String(m.uid) === uid);
+                  if (mail) handleMoveMail(mail, folder.mailbox);
+                }}
               >
                 <span className="folder-label">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -481,6 +707,51 @@ export function MailShell({ session, onLogout }: MailShellProps) {
               </button>
             );
           })}
+
+          {newFolderOpen ? (
+            <form
+              className="new-folder-form"
+              onSubmit={handleCreateFolder}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node) && !newFolderName.trim()) {
+                  setNewFolderOpen(false);
+                }
+              }}
+            >
+              <input
+                autoFocus
+                value={newFolderName}
+                onChange={(event) => setNewFolderName(event.target.value)}
+                placeholder="Ordnername"
+                aria-label="Neuer Ordnername"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setNewFolderName("");
+                    setNewFolderOpen(false);
+                  }
+                }}
+              />
+              <button type="submit" className="icon-button" disabled={isCreatingFolder} title="Erstellen" aria-label="Ordner erstellen">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12l5 5L20 7" />
+                </svg>
+              </button>
+            </form>
+          ) : (
+            <button
+              className="folder-button new-folder-button"
+              onClick={() => setNewFolderOpen(true)}
+              type="button"
+            >
+              <span className="folder-label">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Neuer Ordner
+              </span>
+            </button>
+          )}
+          {folderError && <p className="folder-error">{folderError}</p>}
         </nav>
       </aside>
 
@@ -588,6 +859,15 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                   key={String(mail.uid)}
                   className={`message-row ${isSelected ? "selected" : ""} ${!mail.seen ? "unread" : ""}`}
                   onClick={() => selectMail(mail)}
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData("text/mailux-uid", String(mail.uid));
+                    event.dataTransfer.effectAllowed = "move";
+                  }}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setContextMenu({ x: event.clientX, y: event.clientY, mail });
+                  }}
                 >
                   <span className="message-avatar">{initialsOf(sender.name)}</span>
                   <span className="message-row-body">
@@ -680,7 +960,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
 
               <article className="message-body">
                 {selectedMail.html ? (
-                  <iframe title="Nachricht" sandbox="" srcDoc={wrapMailHtml(selectedMail.html)} />
+                  <MailIframe key={String(selectedMail.uid)} html={selectedMail.html} />
                 ) : (
                   <pre>{selectedMail.text || "Diese Nachricht hat keinen lesbaren Inhalt."}</pre>
                 )}
@@ -865,6 +1145,62 @@ export function MailShell({ session, onLogout }: MailShellProps) {
               </button>
             </footer>
           </form>
+        </div>
+      )}
+
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+          role="menu"
+        >
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => {
+              selectMail(contextMenu.mail);
+              setContextMenu(null);
+            }}
+          >
+            Öffnen
+          </button>
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => handleToggleRead(contextMenu.mail)}
+          >
+            {contextMenu.mail.seen ? "Als ungelesen markieren" : "Als gelesen markieren"}
+          </button>
+
+          <div className="context-menu-divider" />
+          <div className="context-menu-heading">Verschieben nach</div>
+          {allFolders
+            .filter((folder) => folder.mailbox !== activeFolder.mailbox)
+            .map((folder) => (
+              <button
+                key={folder.mailbox}
+                type="button"
+                className="context-menu-item"
+                onClick={() => handleMoveMail(contextMenu.mail, folder.mailbox)}
+              >
+                {folder.label}
+              </button>
+            ))}
+
+          <div className="context-menu-divider" />
+          <button
+            type="button"
+            className="context-menu-item danger"
+            onClick={() => {
+              const mail = contextMenu.mail;
+              setContextMenu(null);
+              handleDelete(mail);
+            }}
+          >
+            {isTrash ? "Endgültig löschen" : "Löschen"}
+          </button>
         </div>
       )}
     </div>

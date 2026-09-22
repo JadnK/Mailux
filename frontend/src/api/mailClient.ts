@@ -1,8 +1,10 @@
 import type {
   ComposePayload,
   DeleteResult,
+  ForwardingSettings,
   GlobalSettings,
   MailboxResponse,
+  MailFolder,
   Session,
   UserSettings,
 } from "../types/mail";
@@ -134,6 +136,44 @@ export async function markAsRead(
   );
 }
 
+export async function listFolders(session: Session): Promise<MailFolder[]> {
+  const result = await requestJson<{ folders: MailFolder[] }>("/mail/folders", {}, session.token);
+  return result.folders;
+}
+
+export async function createFolder(session: Session, name: string): Promise<void> {
+  await requestJson(
+    "/mail/folders",
+    { method: "POST", body: JSON.stringify({ name }) },
+    session.token
+  );
+}
+
+export async function moveMail(
+  session: Session,
+  mailbox: string,
+  uid: number | string,
+  target: string
+): Promise<void> {
+  await requestJson(
+    `/mail/box/${encodeURIComponent(mailbox)}/${encodeURIComponent(String(uid))}/move`,
+    { method: "PATCH", body: JSON.stringify({ target }) },
+    session.token
+  );
+}
+
+export async function markAsUnread(
+  session: Session,
+  mailbox: string,
+  uid: number | string
+): Promise<void> {
+  await requestJson<{ message: string }>(
+    `/mail/box/${encodeURIComponent(mailbox)}/${encodeURIComponent(String(uid))}/unread`,
+    { method: "PATCH" },
+    session.token
+  );
+}
+
 export function attachmentDownloadUrl(mailbox: string, uid: number | string, index: number): string {
   return `${API_BASE}/mail/attachment/${encodeURIComponent(mailbox)}/${encodeURIComponent(
     String(uid)
@@ -243,3 +283,21 @@ export async function updateGlobalSettings(
     session.token
   );
 }
+
+// ---------- own mail forwarding ----------
+
+export async function getMyForwarding(session: Session): Promise<ForwardingSettings> {
+  return requestJson<ForwardingSettings>("/settings/me/forwarding", {}, session.token);
+}
+
+export async function updateMyForwarding(
+  session: Session,
+  forwardingAddress: string | null
+): Promise<ForwardingSettings> {
+  return requestJson<ForwardingSettings>(
+    "/settings/me/forwarding",
+    { method: "PATCH", body: JSON.stringify({ forwardingAddress }) },
+    session.token
+  );
+}
+

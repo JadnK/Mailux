@@ -52,6 +52,12 @@ export type ComposePayload = {
   attachments?: File[];
 };
 
+export type MailFolder = {
+  /** Full IMAP mailbox path, e.g. "Projects/Website" for a nested folder. */
+  name: string;
+  delimiter: string;
+};
+
 export type FolderItem = {
   id: MailFolderId;
   label: string;
@@ -71,4 +77,8 @@ export type UserSettings = {
 export type GlobalSettings = {
   defaultSignature: string;
   maxStorageMB: number;
+};
+
+export type ForwardingSettings = {
+  forwardingAddress: string | null;
 };

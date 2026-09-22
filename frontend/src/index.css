@@ -76,6 +76,17 @@ textarea {
   background: rgba(255, 255, 255, 0.22);
 }
 
+/* The rich-text compose body and the received-mail iframe both sit on a
+   white background (Gmail-style), so the app-wide translucent white
+   selection highlight above is invisible there - text still gets
+   selected, it just doesn't look like it. Override it with a color that
+   reads clearly against white. */
+.rich-text-body::selection,
+.rich-text-body *::selection {
+  background: rgba(37, 99, 235, 0.28);
+  color: inherit;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
@@ -1437,4 +1448,151 @@ textarea {
   .mail-app {
     grid-template-columns: 220px 320px 1fr;
   }
+}
+
+/* ============ folders: custom folder creation + drag/drop ============ */
+
+.new-folder-button {
+  color: var(--text-tertiary);
+}
+.new-folder-button:hover {
+  color: var(--text);
+}
+
+.new-folder-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 4px 10px;
+}
+.new-folder-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+  outline: none;
+}
+.new-folder-form input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.new-folder-form button {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--surface-hover);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.new-folder-form button:hover {
+  background: var(--accent-soft);
+}
+
+.folder-error {
+  margin: 4px 10px 0;
+  color: #ffab9d;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.folder-button.drop-target {
+  background: var(--accent-soft);
+  color: var(--text);
+  outline: 1.5px dashed var(--border-strong);
+  outline-offset: -2px;
+}
+
+.message-row {
+  cursor: grab;
+}
+.message-row:active {
+  cursor: grabbing;
+}
+
+/* ============ right-click context menu ============ */
+
+.context-menu {
+  position: fixed;
+  z-index: 600;
+  min-width: 200px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.45));
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: min(70vh, 420px);
+  overflow-y: auto;
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.context-menu-item:hover {
+  background: var(--surface-hover);
+}
+.context-menu-item.danger {
+  color: #ffab9d;
+}
+.context-menu-item.danger:hover {
+  background: var(--danger-soft);
+}
+
+.context-menu-heading {
+  padding: 6px 10px 2px;
+  color: var(--text-tertiary);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.context-menu-divider {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}
+
+/* ============ settings: forwarding section ============ */
+
+.settings-form--forwarding {
+  margin-top: 30px;
+  padding-top: 26px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-section-heading h2 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.settings-section-heading p {
+  margin: 0 0 18px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
 }
