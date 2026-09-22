@@ -1,5 +1,5 @@
 import { getMailTransporter } from "../config/mail.js";
-import imaps from "imap-simple";
+import imaps, { Connection } from "imap-simple";
 import { simpleParser } from "mailparser";
 import { getImapConfig } from "../config/imap.js";
 import { MailData } from "../types/mail.js";
@@ -9,6 +9,32 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 const MailComposer = require("nodemailer/lib/mail-composer");
+
+const TRASH_MAILBOX = "Trash";
+
+export type MailAttachmentMeta = {
+  index: number;
+  filename: string;
+  contentType: string;
+  size: number;
+};
+
+export type MailSummary = {
+  uid: number | string;
+  from: string;
+  to: string;
+  subject: string;
+  date: string;
+  text?: string;
+  html?: string;
+  attachments: MailAttachmentMeta[];
+};
+
+export type MailboxResult = {
+  mails: MailSummary[];
+  /** false when the mailbox doesn't exist (or isn't accessible) on this account. */
+  folderExists: boolean;
+};
 
 export const sendMail = async (mailData: MailData, username: string, password: string) => {
   const transporter = getMailTransporter(username, password);
@@ -44,83 +70,173 @@ export const saveToSent = async (mailData: MailData, username: string, password:
     const mail = new MailComposer(mailData);
     const raw = await mail.compile().build();
 
-    await connection.imap.append(raw, { mailbox: "Sent", flags: ["\\Seen"] });
+    await connection.append(raw, { mailbox: "Sent", flags: ["\\Seen"] });
   } finally {
-    await connection.end();
+    connection.end();
   }
 };
 
-async function fetchMailbox(username: string, password: string, mailbox: string) {
+function toAttachmentMeta(attachments: any[] | undefined): MailAttachmentMeta[] {
+  if (!attachments) return [];
+
+  return attachments.map((attachment, index) => ({
+    index,
+    filename: attachment.filename || `attachment-${index + 1}`,
+    contentType: attachment.contentType || "application/octet-stream",
+    size: attachment.size ?? attachment.content?.length ?? 0,
+  }));
+}
+
+async function parseMessage(rawPart: any): Promise<MailSummary> {
+  const parsed = await simpleParser(rawPart);
+
+  return {
+    uid: 0, // overwritten by the caller, which has the IMAP attributes
+    from: parsed.from?.text || "",
+    to: parsed.to?.text || "",
+    subject: parsed.subject || "",
+    date: parsed.date?.toString() || "",
+    text: parsed.text || "",
+    html: typeof parsed.html === "string" ? parsed.html : "",
+    attachments: toAttachmentMeta(parsed.attachments),
+  };
+}
+
+async function fetchMailbox(
+  username: string,
+  password: string,
+  mailbox: string
+): Promise<MailboxResult> {
   const imapConfig = getImapConfig(username, password);
   const connection = await imaps.connect(imapConfig);
 
   try {
-    await connection.openBox(mailbox);
+    try {
+      await connection.openBox(mailbox);
+    } catch {
+      // A missing mailbox is a normal state (e.g. no Archive/Spam folder was
+      // ever created for this account) - report it, don't error out.
+      return { mails: [], folderExists: false };
+    }
 
     const messages = await connection.search(["ALL"], { bodies: [""], struct: true });
 
     const mails = await Promise.all(
       messages.map(async (msg: any) => {
         const allParts = msg.parts.find((p: any) => p.which === "");
-        const parsed = await simpleParser(allParts.body);
-
-        return {
-          uid: msg.attributes.uid,
-          from: parsed.from?.text || "",
-          to: parsed.to?.text || "",
-          subject: parsed.subject || "",
-          date: parsed.date?.toString() || "",
-          text: parsed.text || "",
-          html: parsed.html || "",
-        };
+        const summary = await parseMessage(allParts.body);
+        return { ...summary, uid: msg.attributes.uid };
       })
     );
 
-    return mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    mails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return { mails, folderExists: true };
   } finally {
-    await connection.end();
+    connection.end();
   }
 }
 
-export const getInbox = async (username: string, password: string) => {
-  return fetchMailbox(username, password, "INBOX");
+export const getMailbox = (username: string, password: string, mailbox: string) =>
+  fetchMailbox(username, password, mailbox);
+
+export type AttachmentContent = {
+  filename: string;
+  contentType: string;
+  content: Buffer;
 };
 
-export const getSent = async (username: string, password: string) => {
-  return fetchMailbox(username, password, "Sent");
-};
-
-export const replyMail = async (mailData: MailData, username: string, password: string) => {
-  return sendMail(mailData, username, password);
-};
-
-const folders: Record<string, string[]> = {};
-
-export const createFolder = (username: string, folderName: string) => {
-  if (!folders[username]) folders[username] = [];
-  if (!folders[username].includes(folderName)) folders[username].push(folderName);
-  return folders[username];
-};
-
-export const getFolders = (username: string) => {
-  return folders[username] || [];
-};
-
-export const deleteMail = async (
+export const getAttachmentContent = async (
   username: string,
   password: string,
   mailbox: string,
-  mailUid: number
-) => {
+  uid: number,
+  attachmentIndex: number
+): Promise<AttachmentContent | null> => {
   const imapConfig = getImapConfig(username, password);
   const connection = await imaps.connect(imapConfig);
 
   try {
     await connection.openBox(mailbox);
-    await connection.addFlags(mailUid, ["\\Deleted"]);
-    await connection.imap.expunge();
-    return true;
+
+    const messages = await connection.search([["UID", String(uid)]], {
+      bodies: [""],
+      struct: true,
+    });
+
+    const msg = messages[0];
+    if (!msg) return null;
+
+    const allParts = msg.parts.find((p: any) => p.which === "");
+    const parsed = await simpleParser(allParts.body);
+    const attachment = (parsed.attachments || [])[attachmentIndex];
+    if (!attachment) return null;
+
+    return {
+      filename: attachment.filename || `attachment-${attachmentIndex + 1}`,
+      contentType: attachment.contentType || "application/octet-stream",
+      content: attachment.content,
+    };
   } finally {
-    await connection.end();
+    connection.end();
+  }
+};
+
+async function moveToTrash(connection: Connection, mailUid: number): Promise<void> {
+  try {
+    await connection.moveMessage(mailUid, TRASH_MAILBOX);
+    return;
+  } catch {
+    // Most likely cause: this account has no Trash folder yet (it predates
+    // Mailux, or wasn't created through it). Create it once and retry.
+  }
+
+  await connection.addBox(TRASH_MAILBOX).catch(() => {
+    // Ignore - if this fails because the box already exists (a race with
+    // another request, or our first guess was wrong), the retry below will
+    // surface a meaningful error either way.
+  });
+
+  await connection.moveMessage(mailUid, TRASH_MAILBOX);
+}
+
+export type DeleteResult = { movedToTrash: boolean };
+
+/**
+ * Deleting a message from any folder except Trash moves it to Trash - the
+ * behavior every mainstream mail client uses, and the only way "let every
+ * user delete their own mail" is safe to do without a confirmation dialog.
+ * Deleting from Trash itself is permanent.
+ */
+export const deleteMail = async (
+  username: string,
+  password: string,
+  mailbox: string,
+  mailUid: number
+): Promise<DeleteResult> => {
+  const imapConfig = getImapConfig(username, password);
+  const connection = await imaps.connect(imapConfig);
+
+  try {
+    await connection.openBox(mailbox);
+
+    if (mailbox === TRASH_MAILBOX) {
+      await connection.deleteMessage(mailUid);
+      return { movedToTrash: false };
+    }
+
+    try {
+      await moveToTrash(connection, mailUid);
+      return { movedToTrash: true };
+    } catch (err) {
+      console.error(
+        `Could not move message ${mailUid} to Trash, deleting it permanently instead:`,
+        err
+      );
+      await connection.openBox(mailbox);
+      await connection.deleteMessage(mailUid);
+      return { movedToTrash: false };
+    }
+  } finally {
+    connection.end();
   }
 };

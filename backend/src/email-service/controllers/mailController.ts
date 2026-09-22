@@ -1,14 +1,13 @@
 import { Response } from "express";
+import multer from "multer";
 import { AuthRequest } from "../../middleware/auth.js";
 import {
   sendMail,
-  getInbox,
-  getSent,
-  replyMail,
-  createFolder,
-  getFolders,
+  getMailbox,
+  getAttachmentContent,
   deleteMail,
 } from "../services/mailService.js";
+import { MailAttachmentInput, MailData } from "../types/mail.js";
 
 function credentials(req: AuthRequest): { username: string; password: string } {
   if (!req.user) {
@@ -17,10 +16,43 @@ function credentials(req: AuthRequest): { username: string; password: string } {
   return req.user;
 }
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20 MB per file
+    files: 10,
+  },
+});
+
+export const uploadAttachments = upload.array("attachments", 10);
+
 export const sendEmail = async (req: AuthRequest, res: Response) => {
   try {
     const { username, password } = credentials(req);
-    const info = await sendMail(req.body, username, password);
+    const { to, cc, bcc, subject, text, html } = req.body as Record<string, string | undefined>;
+
+    if (!to || !subject) {
+      return res.status(400).json({ message: "to and subject are required" });
+    }
+
+    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+    const attachments: MailAttachmentInput[] = files.map((file) => ({
+      filename: file.originalname,
+      content: file.buffer,
+      contentType: file.mimetype,
+    }));
+
+    const mailData: MailData = {
+      to,
+      cc: cc?.trim() || undefined,
+      bcc: bcc?.trim() || undefined,
+      subject,
+      text,
+      html,
+      attachments: attachments.length > 0 ? attachments : undefined,
+    };
+
+    const info = await sendMail(mailData, username, password);
     res.status(200).json({ message: "Mail sent", id: info.messageId });
   } catch (err) {
     console.error("sendEmail error:", err);
@@ -28,64 +60,44 @@ export const sendEmail = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const getInboxMails = async (req: AuthRequest, res: Response) => {
+export const getMailboxMails = async (req: AuthRequest, res: Response) => {
   try {
     const { username, password } = credentials(req);
-    const mails = await getInbox(username, password);
-    res.json(mails);
+    const mailbox = req.params.mailbox;
+    const result = await getMailbox(username, password, mailbox);
+    res.json(result);
   } catch (err) {
-    console.error("getInboxMails error:", err);
-    res.status(500).json({ message: "Failed to get inbox mails" });
+    console.error("getMailboxMails error:", err);
+    res.status(500).json({ message: "Failed to load mailbox" });
   }
 };
 
-export const getSentMails = async (req: AuthRequest, res: Response) => {
+export const downloadAttachment = async (req: AuthRequest, res: Response) => {
   try {
     const { username, password } = credentials(req);
-    const mails = await getSent(username, password);
-    res.json(mails);
-  } catch (err) {
-    console.error("getSentMails error:", err);
-    res.status(500).json({ message: "Failed to get sent mails" });
-  }
-};
+    const { mailbox, uid, index } = req.params;
 
-export const replyEmail = async (req: AuthRequest, res: Response) => {
-  try {
-    const { username, password } = credentials(req);
-    const info = await replyMail(req.body, username, password);
-    res.status(200).json({ message: "Reply sent", id: info.messageId });
-  } catch (err) {
-    console.error("replyEmail error:", err);
-    res.status(500).json({ message: "Failed to reply" });
-  }
-};
+    const attachment = await getAttachmentContent(
+      username,
+      password,
+      mailbox,
+      Number(uid),
+      Number(index)
+    );
 
-export const addFolder = (req: AuthRequest, res: Response) => {
-  try {
-    const { username } = credentials(req);
-    const { folderName } = req.body as { folderName?: string };
-
-    if (!folderName) {
-      return res.status(400).json({ message: "folderName is required" });
+    if (!attachment) {
+      return res.status(404).json({ message: "Attachment not found" });
     }
 
-    const updatedFolders = createFolder(username, folderName);
-    res.json(updatedFolders);
+    res.setHeader("Content-Type", attachment.contentType);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${encodeURIComponent(attachment.filename)}"`
+    );
+    res.send(attachment.content);
   } catch (err) {
-    console.error("addFolder error:", err);
-    res.status(500).json({ message: "Failed to add folder" });
-  }
-};
-
-export const listFolders = (req: AuthRequest, res: Response) => {
-  try {
-    const { username } = credentials(req);
-    const userFolders = getFolders(username);
-    res.json(userFolders);
-  } catch (err) {
-    console.error("listFolders error:", err);
-    res.status(500).json({ message: "Failed to list folders" });
+    console.error("downloadAttachment error:", err);
+    res.status(500).json({ message: "Failed to download attachment" });
   }
 };
 
@@ -98,8 +110,8 @@ export const deleteEmail = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: "Mailbox and UID are required" });
     }
 
-    await deleteMail(username, password, mailbox, Number(uid));
-    res.status(200).json({ message: "Mail deleted successfully" });
+    const result = await deleteMail(username, password, mailbox, Number(uid));
+    res.status(200).json(result);
   } catch (err) {
     console.error("deleteEmail error:", err);
     res.status(500).json({ message: "Failed to delete mail" });
