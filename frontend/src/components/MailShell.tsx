@@ -1,13 +1,12 @@
-import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import type { DragEvent, FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { UserManagementPanel } from "./UserManagementPanel";
 import {
   deleteMail,
-  getCustomFolders,
-  getInbox,
-  getSent,
+  downloadAttachment,
+  getMailbox,
   isRootUser,
-  sendMail
+  sendMail,
 } from "../api/mailClient";
 import type { ComposePayload, FolderItem, Mail, Session } from "../types/mail";
 
@@ -17,16 +16,17 @@ const SYSTEM_FOLDERS: FolderItem[] = [
   { id: "Drafts", label: "Entwürfe", mailbox: "Drafts", system: true },
   { id: "Archive", label: "Archiv", mailbox: "Archive", system: true },
   { id: "Spam", label: "Spam", mailbox: "Spam", system: true },
-  { id: "Trash", label: "Papierkorb", mailbox: "Trash", system: true, destructive: true }
+  { id: "Trash", label: "Papierkorb", mailbox: "Trash", system: true, destructive: true },
 ];
 
 const FOLDER_ICONS: Record<string, string> = {
-  INBOX: "M4 4h16v10.5l-2.2 3.7a2 2 0 0 1-1.72.98H7.92a2 2 0 0 1-1.72-.98L4 14.5V4Zm0 10.5 3 3h10l3-3M4 10h4l1.5 2h5L16 10h4",
+  INBOX:
+    "M4 4h16v10.5l-2.2 3.7a2 2 0 0 1-1.72.98H7.92a2 2 0 0 1-1.72-.98L4 14.5V4Zm0 10.5 3 3h10l3-3M4 10h4l1.5 2h5L16 10h4",
   Sent: "M3 11.5 20.5 4 13 20.5l-2.6-6.9L3 11.5Zm0 0 8-1.4",
   Drafts: "M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z",
   Archive: "M4 7h16v13H4zM4 4h16v3H4zM10 11h4",
   Spam: "M12 3 3 21h18ZM12 9v5m0 3h.01",
-  Trash: "M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13"
+  Trash: "M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13",
 };
 
 function folderIcon(mailbox: string): string {
@@ -54,7 +54,7 @@ function formatListDate(value: string): string {
   return new Intl.DateTimeFormat("de-DE", {
     day: "2-digit",
     month: "short",
-    year: sameYear ? undefined : "numeric"
+    year: sameYear ? undefined : "numeric",
   }).format(date);
 }
 
@@ -68,8 +68,16 @@ function formatFullDate(value: string): string {
     month: "long",
     year: "numeric",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
   }).format(date);
+}
+
+function formatBytes(bytes: number): string {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** exponent;
+  return `${exponent === 0 ? value : value.toFixed(1)} ${units[exponent]}`;
 }
 
 type Address = { name: string; email: string };
@@ -133,31 +141,35 @@ function wrapMailHtml(html: string): string {
   return `${baseStyle}${html}`;
 }
 
+const EMPTY_COMPOSE: ComposePayload = {
+  to: "",
+  cc: "",
+  bcc: "",
+  subject: "",
+  text: "",
+  attachments: [],
+};
+
 export function MailShell({ session, onLogout }: MailShellProps) {
   const [activeFolder, setActiveFolder] = useState<FolderItem>(SYSTEM_FOLDERS[0]);
   const [activeView, setActiveView] = useState<"mail" | "users">("mail");
-  const [customFolders, setCustomFolders] = useState<FolderItem[]>([]);
   const [mails, setMails] = useState<Mail[]>([]);
+  const [folderExists, setFolderExists] = useState(true);
   const [selectedUid, setSelectedUid] = useState<number | string | null>(null);
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
-  const [compose, setCompose] = useState<ComposePayload>({
-    to: "",
-    subject: "",
-    text: ""
-  });
+  const [showCcBcc, setShowCcBcc] = useState(false);
+  const [isDroppingFile, setIsDroppingFile] = useState(false);
+  const [compose, setCompose] = useState<ComposePayload>(EMPTY_COMPOSE);
+  const [isSending, setIsSending] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const canHardDelete = isRootUser(session.username);
+  const isRoot = isRootUser(session.username);
   const accountInitials = useMemo(() => initialsOf(session.username), [session.username]);
-
-  const folders = useMemo(() => {
-    const existing = new Set(SYSTEM_FOLDERS.map((folder) => folder.mailbox));
-    const uniqueCustom = customFolders.filter((folder) => !existing.has(folder.mailbox));
-    return [...SYSTEM_FOLDERS, ...uniqueCustom];
-  }, [customFolders]);
+  const isTrash = activeFolder.mailbox === "Trash";
 
   const visibleMails = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -173,8 +185,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   }, [mails, query]);
 
   const selectedMail =
-    visibleMails.find((mail) => String(mail.uid) === String(selectedUid)) ??
-    visibleMails[0];
+    visibleMails.find((mail) => String(mail.uid) === String(selectedUid)) ?? visibleMails[0];
 
   async function loadFolder(folder = activeFolder) {
     setIsLoading(true);
@@ -182,21 +193,13 @@ export function MailShell({ session, onLogout }: MailShellProps) {
     setNotice("");
 
     try {
-      let nextMails: Mail[] = [];
-
-      if (folder.mailbox === "INBOX") {
-        nextMails = await getInbox(session);
-      } else if (folder.mailbox === "Sent") {
-        nextMails = await getSent(session);
-      } else {
-        nextMails = [];
-        setNotice(`${folder.label} ist im Frontend vorbereitet. Der Backend-Reader für diesen IMAP-Ordner fehlt noch.`);
-      }
-
-      setMails(nextMails);
-      setSelectedUid(nextMails[0]?.uid ?? null);
+      const result = await getMailbox(session, folder.mailbox);
+      setMails(result.mails);
+      setFolderExists(result.folderExists);
+      setSelectedUid(result.mails[0]?.uid ?? null);
     } catch (err) {
       setMails([]);
+      setFolderExists(true);
       setSelectedUid(null);
       setError(err instanceof Error ? err.message : "Ordner konnte nicht geladen werden");
     } finally {
@@ -204,23 +207,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
     }
   }
 
-  async function loadFolders() {
-    try {
-      const names = await getCustomFolders(session);
-      setCustomFolders(
-        names.map((name) => ({
-          id: name,
-          label: name,
-          mailbox: name
-        }))
-      );
-    } catch {
-      setCustomFolders([]);
-    }
-  }
-
   useEffect(() => {
-    loadFolders();
     loadFolder(SYSTEM_FOLDERS[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -234,23 +221,41 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   async function handleDelete(mail: Mail | undefined) {
     if (!mail) return;
 
-    if (!canHardDelete) {
-      setError("Nur root darf endgültig löschen. Normale Nutzer sollten später nach Trash verschieben.");
-      return;
+    if (isTrash) {
+      const confirmed = window.confirm(
+        `Mail "${mail.subject || "(ohne Betreff)"}" endgültig löschen? Das kann nicht rückgängig gemacht werden.`
+      );
+      if (!confirmed) return;
     }
 
-    const confirmed = window.confirm(
-      `Mail "${mail.subject || "(ohne Betreff)"}" aus ${activeFolder.mailbox} endgültig löschen?`
-    );
-
-    if (!confirmed) return;
-
     try {
-      await deleteMail(session, activeFolder.mailbox, mail.uid);
-      setNotice("Mail wurde gelöscht.");
+      const result = await deleteMail(session, activeFolder.mailbox, mail.uid);
+      setNotice(result.movedToTrash ? "In den Papierkorb verschoben." : "Endgültig gelöscht.");
       await loadFolder(activeFolder);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+    }
+  }
+
+  function addAttachments(files: FileList | File[]) {
+    setCompose((prev) => ({
+      ...prev,
+      attachments: [...(prev.attachments ?? []), ...Array.from(files)],
+    }));
+  }
+
+  function removeAttachment(index: number) {
+    setCompose((prev) => ({
+      ...prev,
+      attachments: (prev.attachments ?? []).filter((_, i) => i !== index),
+    }));
+  }
+
+  function handleComposeDrop(event: DragEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsDroppingFile(false);
+    if (event.dataTransfer.files.length > 0) {
+      addAttachments(event.dataTransfer.files);
     }
   }
 
@@ -258,15 +263,40 @@ export function MailShell({ session, onLogout }: MailShellProps) {
     event.preventDefault();
     setError("");
     setNotice("");
+    setIsSending(true);
 
     try {
       await sendMail(session, compose);
-      setCompose({ to: "", subject: "", text: "" });
+      setCompose(EMPTY_COMPOSE);
+      setShowCcBcc(false);
       setComposeOpen(false);
       setNotice("Nachricht wurde gesendet.");
       if (activeFolder.mailbox === "Sent") await loadFolder(activeFolder);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Senden fehlgeschlagen");
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  function openReply(mail: Mail) {
+    setCompose({
+      to: mail.from,
+      cc: "",
+      bcc: "",
+      subject: mail.subject?.startsWith("Re:") ? mail.subject : `Re: ${mail.subject || ""}`,
+      text: `\n\n--- Original ---\n${plainPreview(mail)}`,
+      attachments: [],
+    });
+    setShowCcBcc(false);
+    setComposeOpen(true);
+  }
+
+  async function handleDownloadAttachment(mail: Mail, attachmentIndex: number, filename: string) {
+    try {
+      await downloadAttachment(session, activeFolder.mailbox, mail.uid, attachmentIndex, filename);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Anhang konnte nicht geladen werden");
     }
   }
 
@@ -281,7 +311,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
             <div className="account-line">
               <span className="account-avatar">{accountInitials}</span>
               <span>{session.username}</span>
-              {canHardDelete && <span className="root-pill">root</span>}
+              {isRoot && <span className="root-pill">root</span>}
             </div>
           </div>
           <button className="icon-button" onClick={onLogout} title="Abmelden" aria-label="Abmelden">
@@ -293,14 +323,21 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           </button>
         </div>
 
-        <button className="compose-button" onClick={() => setComposeOpen(true)}>
+        <button
+          className="compose-button"
+          onClick={() => {
+            setCompose(EMPTY_COMPOSE);
+            setShowCcBcc(false);
+            setComposeOpen(true);
+          }}
+        >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
           Neue Nachricht
         </button>
 
-        {canHardDelete && (
+        {isRoot && (
           <button
             className={`secondary-nav-button ${activeView === "users" ? "active" : ""}`}
             onClick={() => setActiveView("users")}
@@ -315,12 +352,12 @@ export function MailShell({ session, onLogout }: MailShellProps) {
         )}
 
         <nav className="folder-list" aria-label="Mail folders">
-          {folders.map((folder) => (
+          {SYSTEM_FOLDERS.map((folder) => (
             <button
               key={folder.mailbox}
-              className={`folder-button ${activeView === "mail" && activeFolder.mailbox === folder.mailbox ? "active" : ""} ${
-                folder.destructive ? "danger-folder" : ""
-              }`}
+              className={`folder-button ${
+                activeView === "mail" && activeFolder.mailbox === folder.mailbox ? "active" : ""
+              } ${folder.destructive ? "danger-folder" : ""}`}
               onClick={() => switchFolder(folder)}
             >
               <span className="folder-label">
@@ -347,7 +384,13 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           <header className="panel-header">
             <div>
               <h2>{activeFolder.label}</h2>
-              <p>{isLoading ? "Lade Nachrichten…" : `${visibleMails.length} Nachrichten`}</p>
+              <p>
+                {isLoading
+                  ? "Lade Nachrichten…"
+                  : folderExists
+                    ? `${visibleMails.length} Nachrichten`
+                    : "Ordner nicht vorhanden"}
+              </p>
             </div>
             <button className="ghost-button icon-only" onClick={() => loadFolder(activeFolder)} title="Aktualisieren" aria-label="Aktualisieren">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -372,7 +415,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
 
           {(error || notice) && (
             <div
-              className={error ? "inline-message error" : "inline-message"}
+              className={error ? "inline-message error" : "inline-message success"}
               role="status"
               aria-live="polite"
             >
@@ -396,13 +439,26 @@ export function MailShell({ session, onLogout }: MailShellProps) {
               </div>
             )}
 
-            {!isLoading && visibleMails.length === 0 && (
+            {!isLoading && !folderExists && (
+              <div className="empty-list">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 7h16v13H4zM4 7l8-4 8 4" />
+                </svg>
+                <h3>Ordner nicht vorhanden</h3>
+                <p>
+                  Dieses Postfach hat noch keinen &quot;{activeFolder.label}&quot;-Ordner auf dem Mailserver.
+                </p>
+              </div>
+            )}
+
+            {!isLoading && folderExists && visibleMails.length === 0 && (
               <div className="empty-list">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 4h16v10.5l-2.2 3.7a2 2 0 0 1-1.72.98H7.92a2 2 0 0 1-1.72-.98L4 14.5V4Z" />
                   <path d="M4 4l8 7 8-7" />
                 </svg>
-                <p>Keine Nachrichten in diesem Ordner.</p>
+                <h3>Keine Nachrichten</h3>
+                <p>Dieser Ordner ist leer.</p>
               </div>
             )}
 
@@ -424,6 +480,16 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                     </span>
                     <span className="message-subject">{mail.subject || "(ohne Betreff)"}</span>
                     <span className="message-snippet">{plainPreview(mail) || "Keine Vorschau verfügbar."}</span>
+                    {mail.attachments.length > 0 && (
+                      <span className="message-meta-row">
+                        <span className="attachment-indicator">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95L10.13 17.1a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                          </svg>
+                          {mail.attachments.length}
+                        </span>
+                      </span>
+                    )}
                   </span>
                 </button>
               );
@@ -448,46 +514,56 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                       {selectedAddress?.email && selectedAddress.email !== selectedAddress.name && (
                         <span className="reader-address"> &lt;{selectedAddress.email}&gt;</span>
                       )}
-                      {selectedMail.to && <> · an <strong>{selectedMail.to}</strong></>}
+                      {selectedMail.to && (
+                        <>
+                          {" "}
+                          · an <strong>{selectedMail.to}</strong>
+                        </>
+                      )}
                     </p>
                     <p className="reader-date">{formatFullDate(selectedMail.date)}</p>
                   </div>
                 </div>
 
                 <div className="reader-actions">
-                  <button
-                    className="ghost-button"
-                    onClick={() => {
-                      setCompose({
-                        to: selectedMail.from,
-                        subject: selectedMail.subject?.startsWith("Re:")
-                          ? selectedMail.subject
-                          : `Re: ${selectedMail.subject || ""}`,
-                        text: `\n\n--- Original ---\n${plainPreview(selectedMail)}`
-                      });
-                      setComposeOpen(true);
-                    }}
-                  >
+                  <button className="ghost-button" onClick={() => openReply(selectedMail)}>
                     Antworten
                   </button>
                   <button
                     className="danger-button"
-                    disabled={!canHardDelete}
                     onClick={() => handleDelete(selectedMail)}
-                    title={canHardDelete ? "Endgültig löschen" : "Nur root darf endgültig löschen"}
+                    title={isTrash ? "Endgültig löschen" : "In den Papierkorb verschieben"}
                   >
-                    Löschen
+                    {isTrash ? "Endgültig löschen" : "Löschen"}
                   </button>
                 </div>
               </header>
 
+              {selectedMail.attachments.length > 0 && (
+                <div className="attachment-list">
+                  {selectedMail.attachments.map((attachment) => (
+                    <span className="attachment-chip" key={attachment.index}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDownloadAttachment(selectedMail, attachment.index, attachment.filename)
+                        }
+                        title={`${attachment.filename} herunterladen`}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95L10.13 17.1a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                        </svg>
+                        <span className="attachment-name">{attachment.filename}</span>
+                        <span className="attachment-size">{formatBytes(attachment.size)}</span>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
               <article className="message-body">
                 {selectedMail.html ? (
-                  <iframe
-                    title="Nachricht"
-                    sandbox=""
-                    srcDoc={wrapMailHtml(selectedMail.html)}
-                  />
+                  <iframe title="Nachricht" sandbox="" srcDoc={wrapMailHtml(selectedMail.html)} />
                 ) : (
                   <pre>{selectedMail.text || "Diese Nachricht hat keinen lesbaren Inhalt."}</pre>
                 )}
@@ -508,7 +584,16 @@ export function MailShell({ session, onLogout }: MailShellProps) {
 
       {composeOpen && (
         <div className="compose-overlay" role="dialog" aria-modal="true">
-          <form className="compose-window" onSubmit={handleSend}>
+          <form
+            className={`compose-window ${isDroppingFile ? "dropping" : ""}`}
+            onSubmit={handleSend}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setIsDroppingFile(true);
+            }}
+            onDragLeave={() => setIsDroppingFile(false)}
+            onDrop={handleComposeDrop}
+          >
             <header>
               <strong>Neue Nachricht</strong>
               <button
@@ -521,28 +606,108 @@ export function MailShell({ session, onLogout }: MailShellProps) {
               </button>
             </header>
 
+            <div className="compose-body">
+              <input
+                value={compose.to}
+                onChange={(event) => setCompose({ ...compose, to: event.target.value })}
+                placeholder="An"
+                aria-label="Empfänger"
+                required
+              />
+
+              {!showCcBcc && (
+                <button
+                  type="button"
+                  className="text-button compose-cc-toggle"
+                  onClick={() => setShowCcBcc(true)}
+                >
+                  Cc/Bcc hinzufügen
+                </button>
+              )}
+
+              {showCcBcc && (
+                <>
+                  <input
+                    value={compose.cc}
+                    onChange={(event) => setCompose({ ...compose, cc: event.target.value })}
+                    placeholder="Cc"
+                    aria-label="Cc"
+                  />
+                  <input
+                    value={compose.bcc}
+                    onChange={(event) => setCompose({ ...compose, bcc: event.target.value })}
+                    placeholder="Bcc"
+                    aria-label="Bcc"
+                  />
+                </>
+              )}
+
+              <input
+                value={compose.subject}
+                onChange={(event) => setCompose({ ...compose, subject: event.target.value })}
+                placeholder="Betreff"
+                aria-label="Betreff"
+              />
+              <textarea
+                value={compose.text}
+                onChange={(event) => setCompose({ ...compose, text: event.target.value })}
+                placeholder="Nachricht schreiben… (Dateien lassen sich auch hierher ziehen)"
+                aria-label="Nachricht"
+                required
+              />
+
+              {(compose.attachments ?? []).length > 0 && (
+                <div className="attachment-list">
+                  {(compose.attachments ?? []).map((file, index) => (
+                    <span className="attachment-chip pending" key={`${file.name}-${index}`}>
+                      <span className="attachment-name">{file.name}</span>
+                      <span className="attachment-size">{formatBytes(file.size)}</span>
+                      <button
+                        type="button"
+                        className="remove-attachment"
+                        onClick={() => removeAttachment(index)}
+                        aria-label={`${file.name} entfernen`}
+                        title="Entfernen"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <input
-              value={compose.to}
-              onChange={(event) => setCompose({ ...compose, to: event.target.value })}
-              placeholder="An"
-              required
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="compose-attach-input"
+              onChange={(event) => {
+                if (event.target.files) addAttachments(event.target.files);
+                event.target.value = "";
+              }}
             />
-            <input
-              value={compose.subject}
-              onChange={(event) => setCompose({ ...compose, subject: event.target.value })}
-              placeholder="Betreff"
-            />
-            <textarea
-              value={compose.text}
-              onChange={(event) => setCompose({ ...compose, text: event.target.value })}
-              placeholder="Nachricht schreiben…"
-              required
-            />
+
             <footer>
-              <button type="button" className="ghost-button" onClick={() => setComposeOpen(false)}>
-                Abbrechen
+              <div className="compose-footer-actions">
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Datei anhängen"
+                  aria-label="Datei anhängen"
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95L10.13 17.1a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                </button>
+                <button type="button" className="ghost-button" onClick={() => setComposeOpen(false)}>
+                  Abbrechen
+                </button>
+              </div>
+              <button className="primary-button" disabled={isSending}>
+                {isSending ? "Sende…" : "Senden"}
               </button>
-              <button className="primary-button">Senden</button>
             </footer>
           </form>
         </div>
