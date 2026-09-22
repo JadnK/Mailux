@@ -6,6 +6,7 @@ import {
   getUserSettings,
   updateUserSettings,
 } from "../services/settingsService.js";
+import { getForwardingAddress, setForwardingAddress } from "../services/forwardingService.js";
 
 function username(req: AuthRequest): string {
   if (!req.user) {
@@ -49,6 +50,30 @@ export const modifyMySettings = (req: AuthRequest, res: Response) => {
   }
 };
 
+
+// ---------- own mail forwarding (self-service, same username-scoping as above) ----------
+
+export const fetchMyForwarding = (req: AuthRequest, res: Response) => {
+  try {
+    res.json({ forwardingAddress: getForwardingAddress(username(req)) });
+  } catch (err) {
+    console.error("fetchMyForwarding error:", err);
+    res.status(500).json({ message: "Error fetching forwarding settings" });
+  }
+};
+
+export const modifyMyForwarding = (req: AuthRequest, res: Response) => {
+  try {
+    const body = req.body as { forwardingAddress?: string | null };
+    const address = typeof body.forwardingAddress === "string" ? body.forwardingAddress : null;
+
+    setForwardingAddress(username(req), address);
+    res.json({ forwardingAddress: getForwardingAddress(username(req)) });
+  } catch (err: any) {
+    console.error("modifyMyForwarding error:", err);
+    res.status(400).json({ message: err?.message || "Error updating forwarding settings" });
+  }
+};
 
 // ---------- site-wide settings (root only - enforced at the route level) ----------
 
