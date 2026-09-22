@@ -69,8 +69,14 @@ Run everything below as root.
 apt update
 apt install -y postfix postfix-pcre \
   dovecot-imapd dovecot-lmtpd dovecot-core \
-  openssl
+  openssl \
+  libpam0g-dev build-essential python3
 ```
+
+The last line isn't for mail delivery - it's what lets `npm ci` compile
+`authenticate-pam` (the native addon the backend logs in through). Without
+`libpam0g-dev` the build fails on a missing `security/pam_appl.h`, and
+`install.sh`/`reinstall.sh` also check for it before building.
 
 During the Postfix install, choose "Internet Site" and set the system mail
 name to your mail hostname (e.g. `mail.example.com`).
@@ -265,10 +271,16 @@ root while the frontend does not.
 
 ```bash
 cd /opt/mailux-src
-git pull
-sudo ./deploy/install.sh
-sudo systemctl restart mailux-backend mailux-frontend
+sudo ./deploy/reinstall.sh
 ```
+
+`reinstall.sh` pulls the latest commit (if the checkout is clean),
+re-syncs `backend/` and `frontend/` into `/opt/mailux`, rebuilds both,
+re-copies `backend/pam/mailux` to `/etc/pam.d/mailux`, and restarts both
+services. Unlike re-running `install.sh`, it doesn't touch the
+`mailux-web` system user or `/etc/mailux/backend.env`, and it fails
+loudly instead of doing a first install if `/opt/mailux` doesn't exist
+yet.
 
 ## Reverse proxy / HTTPS for the web UI
 

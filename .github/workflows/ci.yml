@@ -26,6 +26,14 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
+      # authenticate-pam is a native addon (node-gyp) that compiles against
+      # the system's PAM headers - without them `npm ci` fails at
+      # `#include <security/pam_appl.h>: No such file or directory`.
+      # build-essential/python3 are already on the runner image; this is
+      # the one header package that isn't.
+      - name: Install PAM development headers
+        run: sudo apt-get update && sudo apt-get install -y libpam0g-dev
+
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck

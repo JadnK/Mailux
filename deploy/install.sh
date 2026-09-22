@@ -30,6 +30,15 @@ if (( NODE_MAJOR < NODE_MAJOR_MIN )); then
   exit 1
 fi
 
+# authenticate-pam (the backend's PAM login binding) is a native addon -
+# npm ci compiles it with node-gyp, which needs PAM's headers on disk.
+# Without them the build fails on "security/pam_appl.h: No such file or
+# directory" instead of anything that says "install libpam0g-dev".
+if [[ ! -f /usr/include/security/pam_appl.h ]]; then
+  echo "==> Installing PAM development headers (libpam0g-dev)"
+  apt-get update && apt-get install -y libpam0g-dev build-essential python3
+fi
+
 echo "==> Creating an unprivileged user for the frontend (mailux-web)"
 if ! id -u mailux-web >/dev/null 2>&1; then
   useradd --system --home-dir /opt/mailux/frontend --shell /usr/sbin/nologin mailux-web
