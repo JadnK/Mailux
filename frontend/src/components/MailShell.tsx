@@ -1,14 +1,15 @@
 import type { DragEvent, FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { UserManagementPanel } from "./UserManagementPanel";
+import { SettingsPanel } from "./SettingsPanel";
 import {
   deleteMail,
   downloadAttachment,
   getMailbox,
-  isRootUser,
+  getMySettings,
   sendMail,
 } from "../api/mailClient";
-import type { ComposePayload, FolderItem, Mail, Session } from "../types/mail";
+import type { ComposePayload, FolderItem, Mail, Session, UserSettings } from "../types/mail";
+import { initialsOf } from "../utils/text";
 
 const SYSTEM_FOLDERS: FolderItem[] = [
   { id: "INBOX", label: "Posteingang", mailbox: "INBOX", system: true },
@@ -95,15 +96,6 @@ function parseAddress(raw: string): Address {
   return { name: raw.trim(), email: raw.trim() };
 }
 
-function initialsOf(name: string): string {
-  const clean = name.trim();
-  if (!clean) return "?";
-
-  const parts = clean.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
-}
-
 function getSenderAddress(mail: Mail, folder: string): Address {
   if (folder === "Sent") return parseAddress(mail.to || "Unbekannter Empfänger");
   return parseAddress(mail.from || "Unbekannter Absender");
@@ -152,7 +144,8 @@ const EMPTY_COMPOSE: ComposePayload = {
 
 export function MailShell({ session, onLogout }: MailShellProps) {
   const [activeFolder, setActiveFolder] = useState<FolderItem>(SYSTEM_FOLDERS[0]);
-  const [activeView, setActiveView] = useState<"mail" | "users">("mail");
+  const [activeView, setActiveView] = useState<"mail" | "settings">("mail");
+  const [mySettings, setMySettings] = useState<UserSettings | null>(null);
   const [mails, setMails] = useState<Mail[]>([]);
   const [folderExists, setFolderExists] = useState(true);
   const [selectedUid, setSelectedUid] = useState<number | string | null>(null);
@@ -167,8 +160,8 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const isRoot = isRootUser(session.username);
-  const accountInitials = useMemo(() => initialsOf(session.username), [session.username]);
+  const displayName = mySettings?.name || session.username;
+  const accountInitials = useMemo(() => initialsOf(displayName), [displayName]);
   const isTrash = activeFolder.mailbox === "Trash";
 
   const visibleMails = useMemo(() => {
@@ -209,6 +202,12 @@ export function MailShell({ session, onLogout }: MailShellProps) {
 
   useEffect(() => {
     loadFolder(SYSTEM_FOLDERS[0]);
+    getMySettings(session)
+      .then(setMySettings)
+      .catch(() => {
+        // Non-fatal - the sidebar just falls back to the username/initials
+        // until settings can be loaded (e.g. retried by opening Einstellungen).
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -309,9 +308,14 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           <div className="account-block">
             <div className="product-name">Mailux</div>
             <div className="account-line">
-              <span className="account-avatar">{accountInitials}</span>
-              <span>{session.username}</span>
-              {isRoot && <span className="root-pill">root</span>}
+              <span className="account-avatar">
+                {mySettings?.profilePicture ? (
+                  <img src={mySettings.profilePicture} alt="" />
+                ) : (
+                  accountInitials
+                )}
+              </span>
+              <span>{displayName}</span>
             </div>
           </div>
           <button className="icon-button" onClick={onLogout} title="Abmelden" aria-label="Abmelden">
@@ -337,19 +341,16 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           Neue Nachricht
         </button>
 
-        {isRoot && (
-          <button
-            className={`secondary-nav-button ${activeView === "users" ? "active" : ""}`}
-            onClick={() => setActiveView("users")}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            User verwalten
-          </button>
-        )}
+        <button
+          className={`secondary-nav-button ${activeView === "settings" ? "active" : ""}`}
+          onClick={() => setActiveView("settings")}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          Einstellungen
+        </button>
 
         <nav className="folder-list" aria-label="Mail folders">
           {SYSTEM_FOLDERS.map((folder) => (
@@ -498,8 +499,8 @@ export function MailShell({ session, onLogout }: MailShellProps) {
         </section>
       )}
 
-      {activeView === "users" ? (
-        <UserManagementPanel session={session} />
+      {activeView === "settings" ? (
+        <SettingsPanel session={session} onSettingsChange={setMySettings} />
       ) : (
         <main className="reader-panel">
           {selectedMail ? (

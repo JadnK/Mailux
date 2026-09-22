@@ -1,8 +1,10 @@
 import type {
   ComposePayload,
   DeleteResult,
+  GlobalSettings,
   MailboxResponse,
   Session,
+  UserSettings,
 } from "../types/mail";
 
 // Relative by default: Mailux expects the frontend and the backend API to
@@ -193,6 +195,56 @@ export async function deleteUser(session: Session, username: string): Promise<vo
   await requestJson(
     `/users/${encodeURIComponent(username)}`,
     { method: "DELETE" },
+    session.token
+  );
+}
+// ---------- own settings ----------
+
+export async function getMySettings(session: Session): Promise<UserSettings> {
+  return requestJson<UserSettings>("/settings/me", {}, session.token);
+}
+
+export async function updateMySettings(
+  session: Session,
+  updates: { name?: string; signature?: string }
+): Promise<UserSettings> {
+  return requestJson<UserSettings>(
+    "/settings/me",
+    { method: "PATCH", body: JSON.stringify(updates) },
+    session.token
+  );
+}
+
+export async function uploadMyAvatar(session: Session, image: Blob): Promise<UserSettings> {
+  const form = new FormData();
+  form.append("avatar", image, "avatar.jpg");
+
+  const response = await fetch(`${API_BASE}/settings/me/avatar`, {
+    method: "POST",
+    headers: authHeaders(session.token),
+    body: form,
+  });
+
+  return handleResponse<UserSettings>(response, session.token);
+}
+
+export async function removeMyAvatar(session: Session): Promise<UserSettings> {
+  return requestJson<UserSettings>("/settings/me/avatar", { method: "DELETE" }, session.token);
+}
+
+// ---------- site-wide settings (root only) ----------
+
+export async function getGlobalSettings(session: Session): Promise<GlobalSettings> {
+  return requestJson<GlobalSettings>("/settings/global", {}, session.token);
+}
+
+export async function updateGlobalSettings(
+  session: Session,
+  updates: Partial<GlobalSettings>
+): Promise<GlobalSettings> {
+  return requestJson<GlobalSettings>(
+    "/settings/global",
+    { method: "PATCH", body: JSON.stringify(updates) },
     session.token
   );
 }

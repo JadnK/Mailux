@@ -58,3 +58,17 @@ export type FolderItem = {
   system?: boolean;
   destructive?: boolean;
 };
+
+export type UserSettings = {
+  name: string;
+  signature: string;
+  canReceiveMail: boolean;
+  vacationMode: boolean;
+  vacationMessage?: string;
+  profilePicture?: string;
+};
+
+export type GlobalSettings = {
+  defaultSignature: string;
+  maxStorageMB: number;
+};

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { AdminShell } from "./components/AdminShell";
 import { LoginPanel } from "./components/LoginPanel";
 import { MailShell } from "./components/MailShell";
+import { isRootUser } from "./api/mailClient";
 import type { Session } from "./types/mail";
 
 function readSavedSession(): Session | null {
@@ -42,6 +44,12 @@ export default function App() {
 
   if (!session) {
     return <LoginPanel onLogin={handleLogin} sessionExpired={sessionExpired} />;
+  }
+
+  // root is an administrator account, not a mailbox in the UI's eyes - it
+  // only ever sees user management and site settings, never folders/mail.
+  if (isRootUser(session.username)) {
+    return <AdminShell session={session} onLogout={handleLogout} />;
   }
 
   return <MailShell session={session} onLogout={handleLogout} />;
