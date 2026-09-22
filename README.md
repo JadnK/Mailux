@@ -30,8 +30,9 @@ it's deployed).
 ## Features
 
 - **Real folders** - Inbox, Sent, Drafts, Archive, Spam and Trash are read
-  straight from IMAP, not hardcoded; a folder that doesn't exist yet on an
-  account shows an honest empty state instead of an error
+  straight from IMAP, auto-created on first visit if an account (or a
+  particular folder) predates Mailux, instead of permanently showing
+  "folder doesn't exist"
 - **Attachments** - drag-and-drop or pick files onto a new message, and
   download attachments straight from a received mail
 - **Compose & reply** - with Cc/Bcc, and sender name/signature pulled from
@@ -39,9 +40,14 @@ it's deployed).
 - **Delete = move to Trash** - available to every logged-in user for their
   own mail (not just root); deleting from Trash itself is permanent, same
   as any other mail client
-- **User management** (root only) - creating and removing mailboxes (system
-  user + Maildir + password) is the one thing kept root-only; everything
-  else in the UI works the same for every account
+- **Profile settings** - every user can set their own display name,
+  signature and a profile picture (resized client-side before upload)
+  under "Einstellungen" - none of it requires root
+- **root is an administrator, not a mailbox** - logging in as root lands on
+  a dedicated screen with exactly two things: user management (creating
+  and removing mailboxes) and site-wide settings. No folders, no compose,
+  no reading anyone's mail through the UI - everything else in the app is
+  the same for every other account
 - **Session-based auth** - PAM login issues a short opaque session token;
   your mail password never sits in browser storage in plaintext (see
   [`docs/SECURITY.md`](docs/SECURITY.md))
