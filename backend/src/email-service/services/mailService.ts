@@ -102,6 +102,11 @@ async function parseMessage(rawPart: any): Promise<MailSummary> {
   };
 }
 
+/** The folders Mailux's UI always offers - safe to auto-create on first
+ *  visit if they're missing, unlike an arbitrary caller-supplied mailbox
+ *  name. */
+const STANDARD_MAILBOXES = new Set(["INBOX", "Sent", "Drafts", "Archive", "Spam", "Trash"]);
+
 async function fetchMailbox(
   username: string,
   password: string,
@@ -114,9 +119,24 @@ async function fetchMailbox(
     try {
       await connection.openBox(mailbox);
     } catch {
-      // A missing mailbox is a normal state (e.g. no Archive/Spam folder was
-      // ever created for this account) - report it, don't error out.
-      return { mails: [], folderExists: false };
+      if (!STANDARD_MAILBOXES.has(mailbox)) {
+        // A missing, non-standard mailbox is a normal state - report it,
+        // don't error out.
+        return { mails: [], folderExists: false };
+      }
+
+      // One of the six standard folders is missing - most likely this
+      // account predates Mailux (or predates a given folder ever being
+      // used) and IMAP simply never created it. Create it once and open
+      // it, instead of permanently showing "folder doesn't exist" for a
+      // folder every account is supposed to have.
+      try {
+        await connection.addBox(mailbox);
+        await connection.openBox(mailbox);
+      } catch (err) {
+        console.error(`Could not create missing mailbox "${mailbox}":`, err);
+        return { mails: [], folderExists: false };
+      }
     }
 
     const messages = await connection.search(["ALL"], { bodies: [""], struct: true });
