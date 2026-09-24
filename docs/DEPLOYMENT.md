@@ -172,6 +172,33 @@ plugin {
 Dovecot recompiles a changed `.dovecot.sieve` automatically on the next
 delivery - no extra step needed after Mailux writes one.
 
+Mailux itself also checks each script it writes with `sievec` (the
+`dovecot-sieve` package's own compiler) right after writing it, and if
+that fails, reports the compiler's error back on the settings page
+instead of the change silently doing nothing. If `sievec` isn't on the
+backend's `PATH` (it checks `sievec`, `/usr/bin/sievec` and
+`/usr/lib/dovecot/sievec`), this check is skipped rather than treated as
+an error - so on an unusual install, a broken script can still go
+unnoticed by Mailux itself.
+
+**Troubleshooting "forwarding/autoresponder doesn't do anything":**
+
+- Confirm `dovecot-sieve` is actually installed and the two config
+  snippets above are both in place - most silent failures are one of
+  these being missing rather than a bug in the generated script itself.
+- Check `~<username>/.dovecot.sieve` on the server directly, and try
+  `sievec ~<username>/.dovecot.sieve` by hand - a compile error there is
+  also what Mailux's own check (above) would have reported back in the
+  UI, if `sievec` was reachable when it saved.
+- Check the mail logs (`journalctl -u dovecot` or
+  `/var/log/mail.log`, depending on distro) for `sieve:` lines around the
+  time a test message was sent - Dovecot logs script errors there even
+  when nothing surfaces anywhere else.
+- The `vacation` action only replies to a message that looks addressed
+  directly to the user (RFC 5230) - it silently skips anything that looks
+  like a mailing list post or has `Auto-Submitted` set, and replies to
+  the same sender at most once a day by design, not a bug.
+
 ### Dovecot: auth + LMTP sockets for Postfix
 
 `/etc/dovecot/conf.d/10-master.conf`:
@@ -455,6 +482,18 @@ Check the queue (`postqueue -p`) and that the LMTP socket exists:
 `ls -la /var/spool/postfix/private | grep dovecot-lmtp`. Remember the LMTP
 transport path in `main.cf` usually needs to be **relative**
 (`lmtp:unix:private/dovecot-lmtp`), not absolute, under a chrooted Postfix.
+
+**Some mailboxes show new mail immediately, others don't**
+Mailux has no fixed limit on how many messages it lists (it fetches
+everything IMAP's `SEARCH ALL` returns for the open folder, every time)
+and no background polling - a folder only reloads when you switch to it,
+open it, or press the refresh button, so the most common cause is simply
+that: reload the folder (or log out/in) before assuming mail is missing.
+If a specific account's folder still doesn't pick up mail you can confirm
+arrived (check `journalctl -u dovecot` or the Maildir's `new/` directory
+on the server directly), that account's Dovecot index is the next thing
+to check, not Mailux - rebuild it with
+`doveadm force-resync -u <user> INBOX`, which is safe to run any time.
 
 **TLS "self-signed certificate" errors**
 Verify Postfix/Dovecot point at real, current Let's Encrypt certs:
