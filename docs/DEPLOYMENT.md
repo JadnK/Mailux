@@ -183,9 +183,19 @@ unnoticed by Mailux itself.
 
 **Troubleshooting "forwarding/autoresponder doesn't do anything":**
 
-- Confirm `dovecot-sieve` is actually installed and the two config
-  snippets above are both in place - most silent failures are one of
-  these being missing rather than a bug in the generated script itself.
+- Confirm the two config snippets above are actually *active*, not just
+  saved to disk (a config edit does nothing until Dovecot is restarted -
+  see "Restart everything, then verify" below):
+
+  ```bash
+  doveconf -f protocol=lmtp -h mail_plugins   # must list "sieve"
+  doveconf -h plugin/sieve                    # must print a path, e.g. ~/.dovecot.sieve
+  ```
+
+  Use `plugin/sieve`, not a bare `-h sieve` - on at least some Dovecot
+  versions the bare form prints nothing even when `plugin { sieve = ... }`
+  is set correctly, which reads as "not configured" when it actually is.
+  Mailux's own check (further down) makes the same `plugin/sieve` query.
 - Check `~<username>/.dovecot.sieve` on the server directly, and try
   `sievec ~<username>/.dovecot.sieve` by hand - a compile error there is
   also what Mailux's own check (above) would have reported back in the
@@ -293,6 +303,36 @@ The socket path depends on your OpenDKIM config - check `Socket` in
 Publish the DKIM public key as a DNS TXT record - it's printed to
 `/etc/opendkim/keys/example.com/mail.txt`. SPF/DMARC go in DNS as shown
 above.
+
+### Restart everything, then verify
+
+None of the config edits above take effect until the services that read
+them are restarted - this step is easy to skip because nothing errors if
+you don't, it just quietly keeps running on the old config. Do this now,
+before moving on to installing Mailux itself, rather than discovering
+later that forwarding/the autoresponder "just don't work":
+
+```bash
+systemctl restart postfix dovecot opendkim
+```
+
+Then confirm Dovecot is actually going to deliver mail over LMTP with
+Sieve active - the exact two things Mailux's own settings page checks
+when you save forwarding/an autoresponder, so getting a clean result here
+means that feature will work on the first try instead of needing to be
+debugged after the fact:
+
+```bash
+postconf local_transport                    # lmtp:unix:private/dovecot-lmtp
+doveconf -f protocol=lmtp -h mail_plugins    # must list "sieve"
+doveconf -h plugin/sieve                     # must print a path, e.g. ~/.dovecot.sieve
+```
+
+If any of these three don't look right, fix that now (re-check the
+matching config file above, and restart again) rather than continuing on
+to install Mailux - it'll work identically either way, but you'll spend
+a lot less time debugging "it's not working" against a fully installed
+app than against three config files you just edited.
 
 ## Installing Mailux
 
