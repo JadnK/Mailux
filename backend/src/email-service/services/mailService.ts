@@ -106,6 +106,19 @@ async function parseMessage(rawPart: any): Promise<MailSummary> {
   };
 }
 
+/**
+ * Prefers the IMAP server's own INTERNALDATE over the message's "Date:"
+ * header for sorting - see the call site in fetchMailbox for why.
+ */
+function resolveMailDate(internalDate: unknown, headerDate: string): string {
+  if (internalDate instanceof Date && !Number.isNaN(internalDate.getTime())) {
+    return internalDate.toISOString();
+  }
+
+  const parsed = new Date(headerDate);
+  return Number.isNaN(parsed.getTime()) ? headerDate : parsed.toISOString();
+}
+
 /** The folders Mailux's UI always offers - safe to auto-create on first
  *  visit if they're missing, unlike an arbitrary caller-supplied mailbox
  *  name. */
@@ -153,6 +166,15 @@ async function fetchMailbox(
         return {
           ...summary,
           uid: msg.attributes.uid,
+          // IMAP's own INTERNALDATE (when Dovecot actually received the
+          // message - node-imap always fetches this, regardless of the
+          // `bodies`/`struct` options above) beats the message's own
+          // "Date:" header for sort order. That header is entirely
+          // sender-controlled - missing, malformed, or just wrong on a
+          // test message sent by a script rather than a real mail client -
+          // and a bad value there is exactly what made new mail land
+          // somewhere in the middle of the list instead of at the top.
+          date: resolveMailDate(msg.attributes?.date, summary.date),
           seen: flags.includes("\\Seen"),
           flagged: flags.includes("\\Flagged"),
         };
