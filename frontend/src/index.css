@@ -1317,6 +1317,24 @@ textarea {
   max-width: 520px;
 }
 
+/* Used only on the Einstellungen page (SettingsPanel), not the Verwaltung
+ * one (AdminPanel) - the latter's content (a user list, a single form)
+ * is a single child and would just collapse into the grid's first track,
+ * the same trap .mail-app's own grid has for a lone child. */
+.settings-grid {
+  max-width: 1080px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  align-items: start;
+  gap: 20px;
+}
+.settings-grid .settings-card {
+  margin-bottom: 0;
+}
+.settings-card--wide {
+  grid-column: 1 / -1;
+}
+
 .settings-loading {
   color: var(--text-tertiary);
   font-size: 13.5px;
@@ -1872,6 +1890,7 @@ textarea {
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow-md);
+  min-width: 0;
 }
 
 .settings-section-heading {

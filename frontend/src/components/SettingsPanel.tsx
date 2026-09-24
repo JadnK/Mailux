@@ -189,7 +189,13 @@ export function SettingsPanel({ session, onSettingsChange }: SettingsPanelProps)
       setVacationMessage(updated.vacationMessage ?? "");
       setVacationStart(updated.vacationStart ?? "");
       setVacationEnd(updated.vacationEnd ?? "");
-      setRoutingNotice("Gespeichert - wird sofort auf neue Mails angewendet.");
+      if (updated.sieveWarning) {
+        // Saved, but Dovecot won't actually act on it - a hard error, not
+        // just a notice, so it doesn't read as "all good".
+        setRoutingError(updated.sieveWarning);
+      } else {
+        setRoutingNotice("Gespeichert - wird sofort auf neue Mails angewendet.");
+      }
     } catch (err) {
       setRoutingError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
     } finally {
@@ -285,7 +291,7 @@ export function SettingsPanel({ session, onSettingsChange }: SettingsPanelProps)
         </div>
       </header>
 
-      <article className="message-body settings-body">
+      <article className="message-body settings-body settings-grid">
         {(error || notice) && (
           <div
             className={error ? "inline-message error" : "inline-message success"}
@@ -378,7 +384,7 @@ export function SettingsPanel({ session, onSettingsChange }: SettingsPanelProps)
             )}
 
             {session.hasMailbox && (
-              <form className="settings-card settings-form" onSubmit={handleSaveRouting}>
+              <form className="settings-card settings-form settings-card--wide" onSubmit={handleSaveRouting}>
                 <div className="settings-section-heading">
                   <SectionIcon path={ICON_ROUTING} />
                   <div>
