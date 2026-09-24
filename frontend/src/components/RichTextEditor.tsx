@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import type { MailTemplate } from "../types/mail";
 
 type RichTextEditorProps = {
   /** Only read once, on mount - this is an uncontrolled editor (like a
@@ -10,6 +11,9 @@ type RichTextEditorProps = {
   initialHtml?: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  /** Quick-reply templates the user has saved - shown as an "insert"
+   *  dropdown in the toolbar when there's at least one. */
+  templates?: MailTemplate[];
 };
 
 const COMMANDS: { command: string; label: string; title: string }[] = [
@@ -24,7 +28,7 @@ const LIST_COMMANDS: { command: string; label: string; title: string }[] = [
   { command: "insertOrderedList", label: "1.", title: "Nummerierte Liste" },
 ];
 
-export function RichTextEditor({ initialHtml, onChange, placeholder }: RichTextEditorProps) {
+export function RichTextEditor({ initialHtml, onChange, placeholder, templates }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -53,6 +57,15 @@ export function RichTextEditor({ initialHtml, onChange, placeholder }: RichTextE
   }
 
   function handleInput() {
+    onChange(editorRef.current?.innerHTML ?? "");
+  }
+
+  function insertTemplate(id: string) {
+    const template = templates?.find((candidate) => candidate.id === id);
+    if (!template) return;
+
+    editorRef.current?.focus();
+    document.execCommand("insertHTML", false, template.body);
     onChange(editorRef.current?.innerHTML ?? "");
   }
 
@@ -103,6 +116,32 @@ export function RichTextEditor({ initialHtml, onChange, placeholder }: RichTextE
         >
           Tx
         </button>
+
+        {templates && templates.length > 0 && (
+          <>
+            <span className="rich-text-divider" aria-hidden="true" />
+            <select
+              className="rich-text-template-select"
+              defaultValue=""
+              aria-label="Vorlage einfügen"
+              onMouseDown={(event) => event.stopPropagation()}
+              onChange={(event) => {
+                const { value } = event.target;
+                if (value) insertTemplate(value);
+                event.target.value = "";
+              }}
+            >
+              <option value="" disabled>
+                Vorlage einfügen…
+              </option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
       <div
         ref={editorRef}

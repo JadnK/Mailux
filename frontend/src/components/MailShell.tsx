@@ -1,6 +1,7 @@
 import type { DragEvent, FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RichTextEditor } from "./RichTextEditor";
+import { AdminPanel } from "./AdminPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import {
   createFolder,
@@ -8,13 +9,23 @@ import {
   downloadAttachment,
   getMailbox,
   getMySettings,
+  getMyTemplates,
   listFolders,
   markAsRead,
   markAsUnread,
   moveMail,
   sendMail,
+  setFlagged,
 } from "../api/mailClient";
-import type { ComposePayload, FolderItem, Mail, MailFolder, Session, UserSettings } from "../types/mail";
+import type {
+  ComposePayload,
+  FolderItem,
+  Mail,
+  MailFolder,
+  MailTemplate,
+  Session,
+  UserSettings,
+} from "../types/mail";
 import { htmlToText, textToHtml } from "../utils/richText";
 import { initialsOf } from "../utils/text";
 
@@ -245,7 +256,7 @@ type ContextMenuState = {
 
 export function MailShell({ session, onLogout }: MailShellProps) {
   const [activeFolder, setActiveFolder] = useState<FolderItem>(SYSTEM_FOLDERS[0]);
-  const [activeView, setActiveView] = useState<"mail" | "settings">("mail");
+  const [activeView, setActiveView] = useState<"mail" | "settings" | "admin">("mail");
   const [mySettings, setMySettings] = useState<UserSettings | null>(null);
   const [mails, setMails] = useState<Mail[]>([]);
   const [folderExists, setFolderExists] = useState(true);
@@ -264,6 +275,8 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [templates, setTemplates] = useState<MailTemplate[]>([]);
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [customFolders, setCustomFolders] = useState<MailFolder[]>([]);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
@@ -298,6 +311,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
     const value = query.trim().toLowerCase();
     return mails.filter((mail) => {
       if (unreadOnly && mail.seen) return false;
+      if (flaggedOnly && !mail.flagged) return false;
       if (!value) return true;
       return [mail.from, mail.to, mail.subject, mail.text]
         .filter(Boolean)
@@ -305,7 +319,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
         .toLowerCase()
         .includes(value);
     });
-  }, [mails, query, unreadOnly]);
+  }, [mails, query, unreadOnly, flaggedOnly]);
 
   const selectedMail =
     visibleMails.find((mail) => String(mail.uid) === String(selectedUid)) ?? visibleMails[0];
@@ -358,6 +372,12 @@ export function MailShell({ session, onLogout }: MailShellProps) {
       .catch(() => {
         // Non-fatal - the sidebar just falls back to the username/initials
         // until settings can be loaded (e.g. retried by opening Einstellungen).
+      });
+    getMyTemplates(session)
+      .then(setTemplates)
+      .catch(() => {
+        // Non-fatal - the compose toolbar just skips the "insert template"
+        // dropdown until this can be retried.
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -546,6 +566,19 @@ export function MailShell({ session, onLogout }: MailShellProps) {
     }
   }
 
+  async function handleToggleFlag(mail: Mail) {
+    setContextMenu(null);
+    const nextFlagged = !mail.flagged;
+    setMails((prev) => prev.map((m) => (m.uid === mail.uid ? { ...m, flagged: nextFlagged } : m)));
+
+    try {
+      await setFlagged(session, activeFolder.mailbox, mail.uid, nextFlagged);
+    } catch {
+      // Non-fatal - worst case it reverts to its previous state on the
+      // next reload.
+    }
+  }
+
   function addAttachments(files: FileList | File[]) {
     setCompose((prev) => ({
       ...prev,
@@ -627,7 +660,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   const selectedAddress = selectedMail ? parseAddress(selectedMail.from || "") : null;
 
   return (
-    <div className={`mail-app ${activeView === "settings" ? "mail-app--single" : ""}`}>
+    <div className={`mail-app ${activeView !== "mail" ? "mail-app--single" : ""}`}>
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="account-block">
@@ -672,6 +705,20 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           </svg>
           Einstellungen
         </button>
+
+        {session.isAdmin && (
+          <button
+            className={`secondary-nav-button ${activeView === "admin" ? "active" : ""}`}
+            onClick={() => setActiveView("admin")}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            Verwaltung
+          </button>
+        )}
 
         <nav className="folder-list" aria-label="Mail folders">
           {allFolders.map((folder) => {
@@ -779,6 +826,16 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                   <circle cx="12" cy="12" r="4" />
                 </svg>
               </button>
+              <button
+                className={`ghost-button icon-only star-filter-button ${flaggedOnly ? "active" : ""}`}
+                onClick={() => setFlaggedOnly((prev) => !prev)}
+                title={flaggedOnly ? "Alle Nachrichten anzeigen" : "Nur markierte anzeigen"}
+                aria-pressed={flaggedOnly}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2.5l2.9 6.6 7.1.7-5.4 4.8 1.6 7-6.2-3.8-6.2 3.8 1.6-7-5.4-4.8 7.1-.7z" />
+                </svg>
+              </button>
               <button className="ghost-button icon-only" onClick={() => loadFolder(activeFolder)} title="Aktualisieren" aria-label="Aktualisieren">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 12a9 9 0 1 1-2.64-6.36" />
@@ -855,10 +912,18 @@ export function MailShell({ session, onLogout }: MailShellProps) {
               const sender = getSenderAddress(mail, activeFolder.mailbox);
               const isSelected = String(selectedMail?.uid) === String(mail.uid);
               return (
-                <button
+                <div
                   key={String(mail.uid)}
                   className={`message-row ${isSelected ? "selected" : ""} ${!mail.seen ? "unread" : ""}`}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => selectMail(mail)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      selectMail(mail);
+                    }
+                  }}
                   draggable
                   onDragStart={(event) => {
                     event.dataTransfer.setData("text/mailux-uid", String(mail.uid));
@@ -888,7 +953,21 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                       </span>
                     )}
                   </span>
-                </button>
+                  <button
+                    type="button"
+                    className={`message-star ${mail.flagged ? "active" : ""}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleToggleFlag(mail);
+                    }}
+                    title={mail.flagged ? "Markierung entfernen" : "Als wichtig markieren"}
+                    aria-pressed={mail.flagged}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill={mail.flagged ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2.5l2.9 6.6 7.1.7-5.4 4.8 1.6 7-6.2-3.8-6.2 3.8 1.6-7-5.4-4.8 7.1-.7z" />
+                    </svg>
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -897,6 +976,8 @@ export function MailShell({ session, onLogout }: MailShellProps) {
 
       {activeView === "settings" ? (
         <SettingsPanel session={session} onSettingsChange={setMySettings} />
+      ) : activeView === "admin" ? (
+        <AdminPanel session={session} />
       ) : (
         <main className="reader-panel">
           {selectedMail ? (
@@ -923,6 +1004,16 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                 </div>
 
                 <div className="reader-actions">
+                  <button
+                    className={`ghost-button icon-only star-filter-button ${selectedMail.flagged ? "active" : ""}`}
+                    onClick={() => handleToggleFlag(selectedMail)}
+                    title={selectedMail.flagged ? "Markierung entfernen" : "Als wichtig markieren"}
+                    aria-pressed={selectedMail.flagged}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill={selectedMail.flagged ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2.5l2.9 6.6 7.1.7-5.4 4.8 1.6 7-6.2-3.8-6.2 3.8 1.6-7-5.4-4.8 7.1-.7z" />
+                    </svg>
+                  </button>
                   <button className="ghost-button" onClick={() => openReply(selectedMail)}>
                     Antworten
                   </button>
@@ -985,6 +1076,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                         initialHtml={compose.html}
                         onChange={(html) => setCompose((prev) => ({ ...prev, html }))}
                         placeholder="Antwort schreiben…"
+                        templates={templates}
                       />
                     </div>
                     <footer>
@@ -1089,6 +1181,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
                 initialHtml={compose.html}
                 onChange={(html) => setCompose((prev) => ({ ...prev, html }))}
                 placeholder="Nachricht schreiben… (Dateien lassen sich auch hierher ziehen)"
+                templates={templates}
               />
 
               {(compose.attachments ?? []).length > 0 && (
@@ -1172,6 +1265,13 @@ export function MailShell({ session, onLogout }: MailShellProps) {
             onClick={() => handleToggleRead(contextMenu.mail)}
           >
             {contextMenu.mail.seen ? "Als ungelesen markieren" : "Als gelesen markieren"}
+          </button>
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => handleToggleFlag(contextMenu.mail)}
+          >
+            {contextMenu.mail.flagged ? "Markierung entfernen" : "Als wichtig markieren"}
           </button>
 
           <div className="context-menu-divider" />
