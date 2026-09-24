@@ -85,25 +85,38 @@ function checkSieveScript(filePath: string): string | null {
  * checks pass (or `doveconf` isn't reachable, in which case this is
  * skipped rather than treated as a failure).
  */
-function checkDovecotSieveConfigured(): string | null {
-  let mailPlugins: string;
-  let sievePluginPath: string;
-
+/** Runs `doveconf -h <args>`, returning the trimmed value, or null if the
+ *  lookup itself failed (binary missing, setting unknown, etc.) - the
+ *  caller decides what a failed/empty lookup means. */
+function queryDoveconf(args: string[]): string | null {
   try {
-    mailPlugins = execFileSync("doveconf", ["-f", "protocol=lmtp", "-h", "mail_plugins"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    }).trim();
-    sievePluginPath = execFileSync("doveconf", ["-h", "sieve"], {
+    return execFileSync("doveconf", args, {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     }).trim();
   } catch {
+    return null;
+  }
+}
+
+function checkDovecotSieveConfigured(): string | null {
+  const mailPlugins = queryDoveconf(["-f", "protocol=lmtp", "-h", "mail_plugins"]);
+  if (mailPlugins === null) {
     // doveconf isn't on PATH, or couldn't be run at all (e.g. this isn't
     // actually running on the mail server) - can't check, so don't
     // pretend to have an answer either way.
     return null;
   }
+
+  // Where Dovecot exposes a plugin setting through `doveconf -h` varies by
+  // version: newer installs answer under "plugin/<name>", but a bare
+  // "<name>" can come back empty even with a correct `plugin { sieve = ... }`
+  // in place - confirmed against a real 2.3-era server, where `-h sieve`
+  // was empty and `-h plugin/sieve` correctly returned the configured path.
+  // Try the namespaced form first, since that's the one that's actually
+  // reliable, and fall back to the bare name for whatever Dovecot version
+  // still wants it that way.
+  const sievePluginPath = queryDoveconf(["-h", "plugin/sieve"]) || queryDoveconf(["-h", "sieve"]) || "";
 
   const problems: string[] = [];
   if (!/(^|\s)sieve(\s|$)/.test(mailPlugins)) {
