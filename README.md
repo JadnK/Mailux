@@ -39,11 +39,13 @@ it's deployed).
   right-click a message for a context menu (move, mark read/unread,
   delete)
 - **Per-account forwarding + autoresponder** - optionally forward incoming
-  mail to another address and/or send an automatic out-of-office reply,
-  both from "Einstellungen". Implemented server-side as a Dovecot Sieve
-  script (`~/.dovecot.sieve`), so it fires immediately on delivery - even
-  if nobody's logged into the web UI - and mail always stays in the
-  account too, it's never a pure redirect
+  mail to another address and/or send an automatic reply, both from
+  "Einstellungen", with a configurable subject, an optional "from X to Y"
+  date window, and one-click presets for a personal vacation reply or a
+  business "thanks for your inquiry" reply to start from. Implemented
+  server-side as a Dovecot Sieve script (`~/.dovecot.sieve`), so it fires
+  immediately on delivery - even if nobody's logged into the web UI - and
+  mail always stays in the account too, it's never a pure redirect
 - **Storage usage** - "Einstellungen" shows how much of the mailbox's
   quota is currently used, with a warning color as it fills up
 - **Mail templates / quick replies** - save reusable text snippets and
@@ -62,6 +64,8 @@ it's deployed).
   as any other mail client
 - **Profile settings** - every user can set their own display name and
   signature under "Einstellungen" - none of it requires root
+- **Change your own password** - from "Einstellungen", re-verified against
+  the current one via PAM before it's changed
 - **Unread tracking** - the inbox badge shows the unread count (not the
   total), unread messages are bolded with a dot in the list, opening one
   marks it read via IMAP, and a header toggle filters the list down to
@@ -71,12 +75,16 @@ it's deployed).
 - **Admin rights follow sudo, not the `root` username** - any account in
   the server's `sudo`/`wheel` group gets a "Verwaltung" section inside the
   normal mail client for user management (creating, deleting and
-  granting/revoking admin rights) and site-wide settings. Unlike the old
-  root-only model, an admin account is still a completely normal, usable
-  mailbox - granting someone admin rights doesn't take their inbox away.
-  Membership is checked live against `/etc/group` on every request, so
-  revoking sudo takes effect immediately. Nobody can remove their own
-  admin rights or delete their own account
+  granting/revoking admin rights) and site-wide settings. An admin account
+  created through Mailux (or granted sudo afterwards) is still a
+  completely normal, usable mailbox - granting someone admin rights
+  doesn't take their inbox away. A pre-existing sudo account that was
+  never created through Mailux (e.g. whoever set the server up over SSH)
+  has no Maildir of its own, though, so it only ever sees Verwaltung and
+  its own password, never mail UI it has nothing to show. Membership is
+  checked live against `/etc/group` on every request, so revoking sudo
+  takes effect immediately. Nobody can remove their own admin rights or
+  delete their own account
 - **Session-based auth** - PAM login issues a short opaque session token;
   your mail password never sits in browser storage in plaintext (see
   [`docs/SECURITY.md`](docs/SECURITY.md))
