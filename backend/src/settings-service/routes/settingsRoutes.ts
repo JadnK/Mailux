@@ -4,6 +4,7 @@ import {
   modifyGlobalSettings,
   fetchMySettings,
   modifyMySettings,
+  changeMyPassword,
   fetchMyUsage,
   fetchMyTemplates,
   addMyTemplate,
@@ -20,6 +21,9 @@ const router = Router();
 // editing the URL).
 router.get("/me", fetchMySettings);
 router.patch("/me", modifyMySettings);
+
+// Own password - re-verifies the current one via PAM before changing it.
+router.patch("/me/password", changeMyPassword);
 
 // Own mailbox storage usage.
 router.get("/me/usage", fetchMyUsage);

@@ -10,8 +10,14 @@ import {
   updateTemplate,
   deleteTemplate,
 } from "../services/settingsService.js";
-import { syncMailRouting, isValidForwardingAddress } from "../services/mailRoutingService.js";
+import {
+  syncMailRouting,
+  isValidForwardingAddress,
+  isValidSieveDate,
+} from "../services/mailRoutingService.js";
 import { getMailboxUsageBytes } from "../services/storageService.js";
+import { authenticateUser, setSystemPassword } from "../../user-service/services/userService.js";
+import { updateSessionPassword } from "../../auth/sessionStore.js";
 
 function username(req: AuthRequest): string {
   if (!req.user) {
@@ -40,14 +46,42 @@ export const modifyMySettings = (req: AuthRequest, res: Response) => {
       name?: string;
       signature?: string;
       vacationMode?: boolean;
+      vacationSubject?: string;
       vacationMessage?: string;
+      vacationStart?: string | null;
+      vacationEnd?: string | null;
       forwardingAddress?: string | null;
     } = {};
 
     if (typeof body.name === "string") updates.name = body.name;
     if (typeof body.signature === "string") updates.signature = body.signature;
     if (typeof body.vacationMode === "boolean") updates.vacationMode = body.vacationMode;
+    if (typeof body.vacationSubject === "string") updates.vacationSubject = body.vacationSubject;
     if (typeof body.vacationMessage === "string") updates.vacationMessage = body.vacationMessage;
+
+    for (const field of ["vacationStart", "vacationEnd"] as const) {
+      if (!(field in body)) continue;
+      const raw = body[field];
+
+      if (raw === null || raw === "") {
+        updates[field] = null;
+        continue;
+      }
+
+      if (typeof raw !== "string" || !isValidSieveDate(raw)) {
+        return res.status(400).json({ message: "Datum bitte im Format JJJJ-MM-TT angeben" });
+      }
+
+      updates[field] = raw;
+    }
+
+    if (
+      (updates.vacationStart ?? undefined) &&
+      (updates.vacationEnd ?? undefined) &&
+      updates.vacationStart! > updates.vacationEnd!
+    ) {
+      return res.status(400).json({ message: "Der Start der Abwesenheit muss vor dem Ende liegen" });
+    }
 
     if ("forwardingAddress" in body) {
       const raw = body.forwardingAddress;
@@ -68,7 +102,10 @@ export const modifyMySettings = (req: AuthRequest, res: Response) => {
       syncMailRouting(username(req), {
         forwardingAddress: updated.forwardingAddress,
         vacationMode: updated.vacationMode,
+        vacationSubject: updated.vacationSubject,
         vacationMessage: updated.vacationMessage,
+        vacationStart: updated.vacationStart,
+        vacationEnd: updated.vacationEnd,
       });
     } catch (err) {
       // Settings were already saved above - a Sieve sync failure (e.g. an
@@ -81,6 +118,46 @@ export const modifyMySettings = (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error("modifyMySettings error:", err);
     res.status(500).json({ message: "Error updating settings" });
+  }
+};
+
+// ---------- own password ----------
+
+export const changeMyPassword = async (req: AuthRequest, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body as {
+      currentPassword?: string;
+      newPassword?: string;
+    };
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Aktuelles und neues Passwort sind erforderlich" });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "Neues Passwort muss mindestens 8 Zeichen haben" });
+    }
+
+    const user = username(req);
+
+    try {
+      await authenticateUser(user, currentPassword);
+    } catch {
+      return res.status(401).json({ message: "Aktuelles Passwort ist falsch" });
+    }
+
+    setSystemPassword(user, newPassword);
+
+    // Keep the session that just changed the password alive with the new
+    // one - IMAP/SMTP calls read it from the session on every request, so
+    // without this the user would be silently logged out mid-session.
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : null;
+    if (token) updateSessionPassword(token, newPassword);
+
+    res.json({ message: "Passwort geändert" });
+  } catch (err) {
+    console.error("changeMyPassword error:", err);
+    res.status(500).json({ message: "Error changing password" });
   }
 };
 

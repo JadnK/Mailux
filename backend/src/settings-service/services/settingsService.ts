@@ -21,7 +21,12 @@ interface UserSettings {
   signature: string;
   canReceiveMail: boolean;
   vacationMode: boolean;
+  vacationSubject?: string;
   vacationMessage?: string;
+  /** "YYYY-MM-DD", or null/undefined for no bound. Autoresponder only
+   *  fires within [vacationStart, vacationEnd] when either is set. */
+  vacationStart?: string | null;
+  vacationEnd?: string | null;
   /** Plain address incoming mail is additionally copied to, or null when
    *  forwarding is off. See mailRoutingService.ts for what actually acts
    *  on this (a Dovecot Sieve script, kept in sync by modifyMySettings). */
@@ -77,7 +82,10 @@ function defaultUserSettings(username: string, globalSettings: GlobalSettings): 
     signature: globalSettings.defaultSignature,
     canReceiveMail: true,
     vacationMode: false,
+    vacationSubject: "",
     vacationMessage: "",
+    vacationStart: null,
+    vacationEnd: null,
     forwardingAddress: null,
     templates: [],
   };

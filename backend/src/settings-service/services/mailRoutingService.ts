@@ -55,11 +55,24 @@ function sieveString(value: string): string {
 export type MailRoutingSettings = {
   forwardingAddress: string | null;
   vacationMode: boolean;
+  vacationSubject?: string;
   vacationMessage?: string;
+  /** "YYYY-MM-DD" (server's local date), or unset/null for no bound on
+   *  that side. When set, the autoresponder only fires on/after (or
+   *  on/before) that date - a normal "away from X to Y" window. */
+  vacationStart?: string | null;
+  vacationEnd?: string | null;
 };
 
+const DEFAULT_VACATION_SUBJECT = "Automatische Antwort";
 const DEFAULT_VACATION_MESSAGE =
   "Ich bin aktuell nicht erreichbar und melde mich, sobald ich wieder da bin.";
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isValidSieveDate(value: string): boolean {
+  return ISO_DATE_PATTERN.test(value);
+}
 
 /**
  * (Re)generates this account's Sieve script from its current settings, or
@@ -83,16 +96,40 @@ export function syncMailRouting(username: string, settings: MailRoutingSettings)
   }
 
   if (settings.vacationMode) {
+    const subject = (settings.vacationSubject?.trim() || DEFAULT_VACATION_SUBJECT).slice(0, 200);
     const message = (settings.vacationMessage?.trim() || DEFAULT_VACATION_MESSAGE).slice(0, 20000);
     requires.add("vacation");
-    actions.push(
-      [
-        "vacation",
-        "    :days 1",
-        `    :subject ${sieveString("Automatische Antwort: Abwesenheit")}`,
-        `    ${sieveString(message)};`,
-      ].join("\n")
-    );
+
+    const vacationAction = [
+      "vacation",
+      "    :days 1",
+      `    :subject ${sieveString(subject)}`,
+      `    ${sieveString(message)};`,
+    ].join("\n");
+
+    // Optional "from X to Y" window: :value "ge"/"le" needs the
+    // relational extension, and currentdate needs the date extension.
+    const dateConditions: string[] = [];
+
+    if (settings.vacationStart && isValidSieveDate(settings.vacationStart)) {
+      requires.add("date");
+      requires.add("relational");
+      dateConditions.push(`currentdate :value "ge" "date" ${sieveString(settings.vacationStart)}`);
+    }
+
+    if (settings.vacationEnd && isValidSieveDate(settings.vacationEnd)) {
+      requires.add("date");
+      requires.add("relational");
+      dateConditions.push(`currentdate :value "le" "date" ${sieveString(settings.vacationEnd)}`);
+    }
+
+    if (dateConditions.length === 0) {
+      actions.push(vacationAction);
+    } else if (dateConditions.length === 1) {
+      actions.push(`if ${dateConditions[0]} {\n  ${vacationAction}\n}`);
+    } else {
+      actions.push(`if allof(${dateConditions.join(", ")}) {\n  ${vacationAction}\n}`);
+    }
   }
 
   if (actions.length === 0) {

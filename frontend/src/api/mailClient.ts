@@ -288,7 +288,10 @@ export type MySettingsUpdate = {
   name?: string;
   signature?: string;
   vacationMode?: boolean;
+  vacationSubject?: string;
   vacationMessage?: string;
+  vacationStart?: string | null;
+  vacationEnd?: string | null;
   forwardingAddress?: string | null;
 };
 
@@ -299,6 +302,18 @@ export async function updateMySettings(
   return requestJson<UserSettings>(
     "/settings/me",
     { method: "PATCH", body: JSON.stringify(updates) },
+    session.token
+  );
+}
+
+export async function changeMyPassword(
+  session: Session,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  await requestJson(
+    "/settings/me/password",
+    { method: "PATCH", body: JSON.stringify({ currentPassword, newPassword }) },
     session.token
   );
 }
