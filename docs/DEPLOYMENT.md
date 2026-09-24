@@ -143,6 +143,37 @@ protocols = imap lmtp
 mail_location = maildir:~/Maildir
 ```
 
+### Dovecot: strip the domain from logins (`auth_username_format`)
+
+Without this, Dovecot passes whatever login string it was given straight
+to the system `passwd`/PAM lookup - fine for Mailux's own web UI, which
+always authenticates with the bare system username (`info`), but not for
+anything that logs in or gets addressed with a full email address
+(`info@example.com`):
+
+- LMTP delivery always addresses the recipient as a full email address
+  (that's just how SMTP/LMTP works) - without this setting, every
+  delivery to every mailbox fails with `550 5.1.1 User doesn't exist:
+  info@example.com`, since there's no literal system user by that name.
+  This silently breaks *all* mail delivery through Dovecot LMTP, not just
+  forwarding/the autoresponder - the account's Maildir simply never
+  receives anything.
+- Any real mail client (Thunderbird, Outlook, a phone's mail app, ...)
+  conventionally logs into IMAP/SMTP with the full email address as the
+  username, not the bare system name - without this, none of them can
+  authenticate, even though Mailux's own web UI works fine.
+
+`/etc/dovecot/conf.d/10-auth.conf`:
+
+```conf
+auth_username_format = %n
+```
+
+`%n` is the login's "user" part only, with any `@domain` stripped -
+`info@example.com` becomes `info` before it ever reaches PAM/passwd, the
+same way Mailux's own login already works. Restart Dovecot after adding
+this (see "Restart everything, then verify" further down).
+
 ### Dovecot: Sieve (server-side forwarding + autoresponder)
 
 Mailux's "Weiterleitung" and "Autoresponder" account settings work by
@@ -208,6 +239,14 @@ unnoticed by Mailux itself.
   directly to the user (RFC 5230) - it silently skips anything that looks
   like a mailing list post or has `Auto-Submitted` set, and replies to
   the same sender at most once a day by design, not a bug.
+- If mail to the account doesn't arrive *at all* (bounces with `550 5.1.1
+  User doesn't exist: <account>@yourdomain` in `/var/log/mail.log`, not
+  just a missing autoresponder), that's `auth_username_format` missing -
+  see "Dovecot: strip the domain from logins" above. It's listed
+  separately from the Sieve config because it breaks *all* delivery
+  through Dovecot LMTP, not specifically forwarding/the autoresponder,
+  but its symptom (mail just never shows up) looks identical from Mailux's
+  side, so it's worth ruling out first.
 
 ### Dovecot: auth + LMTP sockets for Postfix
 
@@ -326,13 +365,18 @@ debugged after the fact:
 postconf local_transport                    # lmtp:unix:private/dovecot-lmtp
 doveconf -f protocol=lmtp -h mail_plugins    # must list "sieve"
 doveconf -h plugin/sieve                     # must print a path, e.g. ~/.dovecot.sieve
+doveconf -h auth_username_format             # must be "%n", not empty/"%Lu"
 ```
 
-If any of these three don't look right, fix that now (re-check the
+If any of these four don't look right, fix that now (re-check the
 matching config file above, and restart again) rather than continuing on
 to install Mailux - it'll work identically either way, but you'll spend
 a lot less time debugging "it's not working" against a fully installed
-app than against three config files you just edited.
+app than against four config files you just edited. A missing
+`auth_username_format` in particular won't show up as an error anywhere
+in this checklist failing - it only surfaces once real mail tries to
+deliver, as a `550 5.1.1 User doesn't exist: <account>@yourdomain` bounce
+that has nothing obviously to do with its actual cause.
 
 ## Installing Mailux
 
