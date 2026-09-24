@@ -6,19 +6,21 @@ import {
   updateUser,
   deactivateUser,
   createUser,
+  setUserAdmin,
 } from "../controllers/userController.js";
 
-import { requireRoot } from "../../middleware/auth.js";
+import { requireAdmin } from "../../middleware/auth.js";
 
 const router = Router();
 
-router.use(requireRoot);
+router.use(requireAdmin);
 
 // User Endpoints
 router.get("/", listUsers);
 router.post("/create", createUser);
 router.get("/:username", getSingleUser);
 router.patch("/:username", updateUser);
+router.patch("/:username/admin", setUserAdmin);
 router.delete("/:username", deactivateUser);
 
 export default router;

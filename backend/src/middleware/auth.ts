@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getSession } from "../auth/sessionStore.js";
+import { isAdminUsername } from "../user-service/services/userService.js";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -27,9 +28,18 @@ export const requireAuth = (req: AuthRequest, res: Response, next: NextFunction)
   next();
 };
 
-export const requireRoot = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (req.user?.username !== "root") {
-    return res.status(403).json({ message: "Root access required" });
+/**
+ * Admin access is no longer tied to the literal "root" account - it's
+ * derived live from system sudo/wheel group membership (see
+ * isAdminUsername), the same way `sudo` itself decides who's privileged.
+ * That means any account can be made an admin (and keep a normal mailbox
+ * alongside it), not just root.
+ */
+export const requireAdmin = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const username = req.user?.username;
+
+  if (!username || !(await isAdminUsername(username))) {
+    return res.status(403).json({ message: "Admin-Rechte erforderlich" });
   }
 
   next();

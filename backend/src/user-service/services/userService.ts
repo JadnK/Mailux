@@ -20,6 +20,10 @@ export interface UserSettings {
   name?: string;
   signature?: string;
   canReceiveMail?: boolean;
+  /** True for root and for any system user in the "sudo" (or "wheel")
+   *  group - always derived live from the system group file, never
+   *  cached/stored, so revoking sudo takes effect immediately. */
+  isAdmin?: boolean;
 }
 
 type PamModule =
@@ -65,6 +69,43 @@ function setSystemPassword(username: string, password: string): void {
   if (result.status !== 0) {
     throw new Error(`chpasswd failed: ${result.stderr?.toString().trim() || "unknown error"}`);
   }
+}
+
+/**
+ * Whether `username` is a member of the system's sudo/wheel group - i.e.
+ * whether they're allowed to run privileged commands via `sudo`. This is
+ * the basis for Mailux admin rights: root is always an admin, and any
+ * other account becomes one purely by having sudo, not by a Mailux-only
+ * flag - so a user's admin status here always matches what they can
+ * actually do on the underlying system.
+ */
+export async function isSudoGroupMember(username: string): Promise<boolean> {
+  try {
+    const content = await fs.readFile("/etc/group", "utf8");
+    const lines = content.split("\n");
+
+    for (const groupName of ["sudo", "wheel"]) {
+      const line = lines.find((entry) => entry.startsWith(`${groupName}:`));
+      if (!line) continue;
+
+      const members = (line.split(":")[3] ?? "")
+        .split(",")
+        .map((member) => member.trim())
+        .filter(Boolean);
+
+      if (members.includes(username)) return true;
+    }
+
+    return false;
+  } catch (err) {
+    console.error("isSudoGroupMember: could not read /etc/group:", err);
+    return false;
+  }
+}
+
+export async function isAdminUsername(username: string): Promise<boolean> {
+  if (username === "root") return true;
+  return isSudoGroupMember(username);
 }
 
 export default class UserService {
@@ -146,15 +187,22 @@ export default class UserService {
           const hasMaildir = await this.hasMaildir(sysUser.home);
           if (!hasMaildir) return;
 
+          // Always re-derived from the system group, never trusted from
+          // the cache - sudo membership can change outside of Mailux too.
+          const isAdmin = await isSudoGroupMember(sysUser.username);
+
           if (!this.userSettingsStore.has(sysUser.username)) {
             this.userSettingsStore.set(sysUser.username, {
               username: sysUser.username,
               canReceiveMail: true,
+              isAdmin,
             });
+          } else {
+            const existing = this.userSettingsStore.get(sysUser.username)!;
+            this.userSettingsStore.set(sysUser.username, { ...existing, isAdmin });
           }
 
-          const settings = this.userSettingsStore.get(sysUser.username)!;
-          results.push(settings);
+          results.push(this.userSettingsStore.get(sysUser.username)!);
         } catch (err) {
           console.warn(`UserService: error checking Maildir for ${sysUser.username}`, err);
         }
@@ -207,6 +255,32 @@ export default class UserService {
     }
   }
 
+  /**
+   * Grants or revokes sudo group membership - the actual, single source
+   * of truth for Mailux admin rights (see isSudoGroupMember above). root
+   * can't be changed here: it's always an admin and was never created
+   * through Mailux, so adding/removing it from a group would be a
+   * confusing no-op at best.
+   */
+  public async setAdmin(username: string, wantAdmin: boolean): Promise<void> {
+    assertValidUsername(username);
+
+    if (username === "root") {
+      throw new Error("root ist immer Administrator und kann nicht geändert werden");
+    }
+
+    if (wantAdmin) {
+      runPrivileged("usermod", ["-aG", "sudo", username]);
+    } else {
+      try {
+        runPrivileged("gpasswd", ["-d", username, "sudo"]);
+      } catch {
+        // gpasswd exits non-zero if the user isn't currently a sudo
+        // member - that's already the desired end state, not a failure.
+      }
+    }
+  }
+
   public async refreshCache(): Promise<UserSettings[]> {
     const sysUsers = await this.readSystemUsers();
     const sysUsernames = new Set(sysUsers.map((u) => u.username));
@@ -224,7 +298,11 @@ export default class UserService {
     return Array.from(this.userSettingsStore.values());
   }
 
-  public async createUser(username: string, password: string): Promise<boolean> {
+  public async createUser(
+    username: string,
+    password: string,
+    options?: { isAdmin?: boolean }
+  ): Promise<boolean> {
     assertValidUsername(username);
 
     try {
@@ -261,9 +339,20 @@ export default class UserService {
       runPrivileged("chmod", ["-R", "700", mailDir]);
       setSystemPassword(username, password);
 
+      if (options?.isAdmin) {
+        try {
+          runPrivileged("usermod", ["-aG", "sudo", username]);
+        } catch (err) {
+          // Non-fatal - the mailbox itself was created successfully; an
+          // admin can grant sudo afterwards from the user list.
+          console.error(`Could not grant sudo to new user ${username}:`, err);
+        }
+      }
+
       this.userSettingsStore.set(username, {
         username,
         canReceiveMail: true,
+        isAdmin: !!options?.isAdmin,
       });
 
       return true;

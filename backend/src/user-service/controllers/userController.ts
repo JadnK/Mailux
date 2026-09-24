@@ -1,9 +1,10 @@
-import { Request, Response } from "express";
+import { Response } from "express";
+import { AuthRequest } from "../../middleware/auth.js";
 import UserService from "../services/userService.js";
 
 const userService = new UserService();
 
-export const listUsers = async (req: Request, res: Response) => {
+export const listUsers = async (req: AuthRequest, res: Response) => {
   try {
     const users = await userService.getAllUsersWithMaildir();
     return res.json(users);
@@ -13,7 +14,7 @@ export const listUsers = async (req: Request, res: Response) => {
   }
 };
 
-export const getSingleUser = async (req: Request, res: Response) => {
+export const getSingleUser = async (req: AuthRequest, res: Response) => {
   try {
     const username = req.params.username;
     if (!username) return res.status(400).json({ message: "username required" });
@@ -28,7 +29,7 @@ export const getSingleUser = async (req: Request, res: Response) => {
   }
 };
 
-export const updateUser = async (req: Request, res: Response) => {
+export const updateUser = async (req: AuthRequest, res: Response) => {
   try {
     const username = req.params.username;
     const updates = req.body;
@@ -44,10 +45,39 @@ export const updateUser = async (req: Request, res: Response) => {
   }
 };
 
-export const deactivateUser = async (req: Request, res: Response) => {
+export const setUserAdmin = async (req: AuthRequest, res: Response) => {
+  try {
+    const username = req.params.username;
+    const { isAdmin } = req.body as { isAdmin?: boolean };
+
+    if (!username) return res.status(400).json({ message: "username required" });
+    if (typeof isAdmin !== "boolean") {
+      return res.status(400).json({ message: "isAdmin (boolean) required" });
+    }
+
+    if (req.user?.username === username && !isAdmin) {
+      return res.status(400).json({
+        message: "Du kannst dir nicht selbst die Admin-Rechte entziehen.",
+      });
+    }
+
+    await userService.setAdmin(username, isAdmin);
+    return res.json({ username, isAdmin });
+  } catch (err) {
+    console.error("setUserAdmin error:", err);
+    const message = err instanceof Error ? err.message : "Failed to update admin status";
+    return res.status(400).json({ message });
+  }
+};
+
+export const deactivateUser = async (req: AuthRequest, res: Response) => {
   try {
     const username = req.params.username;
     if (!username) return res.status(400).json({ message: "username required" });
+
+    if (req.user?.username === username) {
+      return res.status(400).json({ message: "Du kannst dich nicht selbst löschen." });
+    }
 
     const ok = await userService.deleteUser(username);
     if (!ok) return res.status(404).json({ message: "User not found or could not be removed" });
@@ -61,9 +91,13 @@ export const deactivateUser = async (req: Request, res: Response) => {
   }
 };
 
-export const createUser = async (req: Request, res: Response) => {
+export const createUser = async (req: AuthRequest, res: Response) => {
   try {
-    const { username, password } = req.body as { username?: string; password?: string };
+    const { username, password, isAdmin } = req.body as {
+      username?: string;
+      password?: string;
+      isAdmin?: boolean;
+    };
 
     if (!username || !password) {
       return res.status(400).json({ message: "Username and password required" });
@@ -81,12 +115,12 @@ export const createUser = async (req: Request, res: Response) => {
       });
     }
 
-    const success = await userService.createUser(username, password);
+    const success = await userService.createUser(username, password, { isAdmin: !!isAdmin });
     if (!success) {
       return res.status(500).json({ message: "Failed to create user" });
     }
 
-    return res.json({ message: "User created successfully", username });
+    return res.json({ message: "User created successfully", username, isAdmin: !!isAdmin });
   } catch (err) {
     console.error("createUser error:", err);
     return res.status(500).json({ message: "Failed to create user" });

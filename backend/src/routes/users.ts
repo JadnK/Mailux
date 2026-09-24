@@ -1,12 +1,13 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { authenticateUser } from "../user-service/services/userService.js";
+import { authenticateUser, isAdminUsername } from "../user-service/services/userService.js";
 import { createSession } from "../auth/sessionStore.js";
 
 const router = Router();
 
 // PAM auth is only as strong as the account password behind it, and this
-// endpoint can authenticate as root - rate-limit it against brute-forcing.
+// endpoint can authenticate as root (or any other sudo account) - rate
+// limit it against brute-forcing.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
@@ -29,7 +30,8 @@ router.post("/", loginLimiter, async (req, res) => {
   }
 
   const token = createSession(username, password);
-  return res.json({ username, token });
+  const isAdmin = await isAdminUsername(username);
+  return res.json({ username, token, isAdmin });
 });
 
 export default router;
