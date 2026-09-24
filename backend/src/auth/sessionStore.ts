@@ -58,6 +58,17 @@ export function destroySession(token: string): void {
   sessions.delete(token);
 }
 
+/**
+ * Updates the password kept for an already-active session - used right
+ * after a successful self-service password change, so the session that
+ * just changed it keeps working (IMAP/SMTP calls use this password on
+ * every request) instead of being silently logged out mid-session.
+ */
+export function updateSessionPassword(token: string, password: string): void {
+  const record = sessions.get(token);
+  if (record) record.password = password;
+}
+
 export function activeSessionCount(): number {
   return sessions.size;
 }

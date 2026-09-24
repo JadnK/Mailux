@@ -60,7 +60,7 @@ function runPrivileged(command: string, args: string[]): void {
 }
 
 /** Sets a system user's password via chpasswd's stdin, never via argv/echo. */
-function setSystemPassword(username: string, password: string): void {
+export function setSystemPassword(username: string, password: string): void {
   const result = spawnSync("chpasswd", [], {
     input: `${username}:${password}\n`,
     stdio: ["pipe", "pipe", "pipe"],
@@ -108,6 +108,64 @@ export async function isAdminUsername(username: string): Promise<boolean> {
   return isSudoGroupMember(username);
 }
 
+/** Reads a system account's home directory straight from /etc/passwd, or null if it doesn't exist. */
+async function readHomeForUser(username: string): Promise<string | null> {
+  try {
+    const content = await fs.readFile("/etc/passwd", "utf8");
+    const lines = content.split("\n").filter(Boolean);
+
+    for (const line of lines) {
+      const parts = line.split(":");
+      if (parts[0] === username) return parts[5] || null;
+    }
+
+    return null;
+  } catch (err) {
+    console.error("readHomeForUser: could not read /etc/passwd:", err);
+    return null;
+  }
+}
+
+async function pathExists(candidate: string): Promise<boolean> {
+  try {
+    await fs.access(candidate);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether `home` actually has a Maildir under it - shared by the admin user list and hasMailbox() below. */
+export async function hasMaildirAt(home: string | null): Promise<boolean> {
+  if (!home) return false;
+
+  const candidates = [
+    path.join(home, "Maildir"),
+    path.join(home, "Maildir", "cur"),
+    path.join(home, "mail", "Maildir"),
+  ];
+
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Whether `username` actually has a mailbox (a Maildir on this server) -
+ * having sudo does not imply this. A pre-existing sudo account that was
+ * never created through Mailux (e.g. whoever set this server up over
+ * SSH) is an admin but has no Postfix/Dovecot mailbox at all, so the
+ * mail client should stay out of their way entirely: no folders, no
+ * compose, nothing to read - just the "Verwaltung" tools their sudo
+ * rights actually grant them.
+ */
+export async function hasMailbox(username: string): Promise<boolean> {
+  const home = await readHomeForUser(username);
+  return hasMaildirAt(home);
+}
+
 export default class UserService {
   private userSettingsStore: Map<string, UserSettings> = new Map();
   private cacheTimestamp: number | null = null;
@@ -129,33 +187,6 @@ export default class UserService {
     const shell = parts[6] || "";
 
     return { username, uid, gid, comment, home, shell };
-  }
-
-  private async fileExists(p: string): Promise<boolean> {
-    try {
-      await fs.access(p);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private async hasMaildir(home: string): Promise<boolean> {
-    if (!home) return false;
-
-    const candidates = [
-      path.join(home, "Maildir"),
-      path.join(home, "Maildir", "cur"),
-      path.join(home, "mail", "Maildir"),
-    ];
-
-    for (const candidate of candidates) {
-      if (await this.fileExists(candidate)) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
   private async readSystemUsers(): Promise<SysUser[]> {
@@ -184,7 +215,7 @@ export default class UserService {
     await Promise.all(
       sysUsers.map(async (sysUser) => {
         try {
-          const hasMaildir = await this.hasMaildir(sysUser.home);
+          const hasMaildir = await hasMaildirAt(sysUser.home);
           if (!hasMaildir) return;
 
           // Always re-derived from the system group, never trusted from

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { authenticateUser, isAdminUsername } from "../user-service/services/userService.js";
+import { authenticateUser, isAdminUsername, hasMailbox } from "../user-service/services/userService.js";
 import { createSession } from "../auth/sessionStore.js";
 
 const router = Router();
@@ -30,8 +30,11 @@ router.post("/", loginLimiter, async (req, res) => {
   }
 
   const token = createSession(username, password);
-  const isAdmin = await isAdminUsername(username);
-  return res.json({ username, token, isAdmin });
+  const [isAdmin, hasOwnMailbox] = await Promise.all([
+    isAdminUsername(username),
+    hasMailbox(username),
+  ]);
+  return res.json({ username, token, isAdmin, hasMailbox: hasOwnMailbox });
 });
 
 export default router;

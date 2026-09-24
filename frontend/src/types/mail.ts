@@ -43,6 +43,9 @@ export type Session = {
   token: string;
   /** True for root and for any account in the system's sudo/wheel group. */
   isAdmin: boolean;
+  /** False for a sudo-only admin account with no Postfix/Dovecot Maildir -
+   *  they can manage users but have nothing of their own to read/send. */
+  hasMailbox: boolean;
 };
 
 export type ComposePayload = {
@@ -80,7 +83,11 @@ export type UserSettings = {
   signature: string;
   canReceiveMail: boolean;
   vacationMode: boolean;
+  vacationSubject?: string;
   vacationMessage?: string;
+  /** "YYYY-MM-DD", or null/undefined for no bound. */
+  vacationStart?: string | null;
+  vacationEnd?: string | null;
   forwardingAddress: string | null;
   templates: MailTemplate[];
 };
