@@ -24,6 +24,7 @@ export type Mail = {
   html?: string;
   attachments: MailAttachment[];
   seen: boolean;
+  flagged: boolean;
 };
 
 export type MailboxResponse = {
@@ -40,6 +41,8 @@ export type DeleteResult = {
 export type Session = {
   username: string;
   token: string;
+  /** True for root and for any account in the system's sudo/wheel group. */
+  isAdmin: boolean;
 };
 
 export type ComposePayload = {
@@ -66,12 +69,20 @@ export type FolderItem = {
   destructive?: boolean;
 };
 
+export type MailTemplate = {
+  id: string;
+  name: string;
+  body: string;
+};
+
 export type UserSettings = {
   name: string;
   signature: string;
   canReceiveMail: boolean;
   vacationMode: boolean;
   vacationMessage?: string;
+  forwardingAddress: string | null;
+  templates: MailTemplate[];
 };
 
 export type GlobalSettings = {
@@ -79,6 +90,7 @@ export type GlobalSettings = {
   maxStorageMB: number;
 };
 
-export type ForwardingSettings = {
-  forwardingAddress: string | null;
+export type MailboxUsage = {
+  usedBytes: number;
+  limitBytes: number;
 };

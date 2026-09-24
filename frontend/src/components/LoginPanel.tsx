@@ -9,7 +9,7 @@ type LoginPanelProps = {
 };
 
 export function LoginPanel({ onLogin, sessionExpired }: LoginPanelProps) {
-  const [username, setUsername] = useState("root");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isBusy, setIsBusy] = useState(false);
@@ -51,7 +51,7 @@ export function LoginPanel({ onLogin, sessionExpired }: LoginPanelProps) {
               autoComplete="username"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              placeholder="root"
+              placeholder="dein-benutzername"
             />
           </label>
 

@@ -61,60 +61,54 @@ export function GlobalSettingsPanel({ session }: GlobalSettingsPanelProps) {
   }
 
   return (
-    <main className="reader-panel">
-      <header className="reader-header">
-        <div>
-          <h1>Server-Einstellungen</h1>
-          <p>Gilt für die gesamte Mailux-Installation.</p>
+    <div className="admin-section">
+      {(error || notice) && (
+        <div
+          className={error ? "inline-message error" : "inline-message success"}
+          role="status"
+          aria-live="polite"
+        >
+          {error || notice}
         </div>
-      </header>
+      )}
 
-      <article className="message-body settings-body">
-        {(error || notice) && (
-          <div
-            className={error ? "inline-message error" : "inline-message success"}
-            role="status"
-            aria-live="polite"
-          >
-            {error || notice}
-          </div>
-        )}
+      {isLoading || !settings ? (
+        <p className="settings-loading">Lade Einstellungen…</p>
+      ) : (
+        <form className="settings-form" onSubmit={handleSave}>
+          <label>
+            Standard-Signatur
+            <textarea
+              value={defaultSignature}
+              onChange={(event) => setDefaultSignature(event.target.value)}
+              rows={4}
+            />
+            <span className="settings-field-hint">
+              Vorbelegung für neu angelegte Mailboxen - jeder User kann sie danach unter
+              „Einstellungen" selbst ändern.
+            </span>
+          </label>
 
-        {isLoading || !settings ? (
-          <p className="settings-loading">Lade Einstellungen…</p>
-        ) : (
-          <form className="settings-form" onSubmit={handleSave}>
-            <label>
-              Standard-Signatur
-              <textarea
-                value={defaultSignature}
-                onChange={(event) => setDefaultSignature(event.target.value)}
-                rows={4}
-              />
-              <span className="settings-field-hint">
-                Vorbelegung für neu angelegte Mailboxen - jeder User kann sie danach unter
-                „Einstellungen" selbst ändern.
-              </span>
-            </label>
+          <label>
+            Speicherlimit pro Postfach (MB)
+            <input
+              type="number"
+              min={0}
+              value={maxStorageMB}
+              onChange={(event) => setMaxStorageMB(Number(event.target.value))}
+            />
+            <span className="settings-field-hint">
+              Wird jedem User als Richtwert unter „Einstellungen" angezeigt.
+            </span>
+          </label>
 
-            <label>
-              Speicherlimit pro Postfach (MB)
-              <input
-                type="number"
-                min={0}
-                value={maxStorageMB}
-                onChange={(event) => setMaxStorageMB(Number(event.target.value))}
-              />
-            </label>
-
-            <footer className="settings-form-footer">
-              <button className="primary-button" type="submit" disabled={isSaving}>
-                {isSaving ? "Speichert…" : "Speichern"}
-              </button>
-            </footer>
-          </form>
-        )}
-      </article>
-    </main>
+          <footer className="settings-form-footer">
+            <button className="primary-button" type="submit" disabled={isSaving}>
+              {isSaving ? "Speichert…" : "Speichern"}
+            </button>
+          </footer>
+        </form>
+      )}
+    </div>
   );
 }

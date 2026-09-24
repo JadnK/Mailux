@@ -1,10 +1,11 @@
 import type {
   ComposePayload,
   DeleteResult,
-  ForwardingSettings,
   GlobalSettings,
   MailboxResponse,
+  MailboxUsage,
   MailFolder,
+  MailTemplate,
   Session,
   UserSettings,
 } from "../types/mail";
@@ -136,6 +137,31 @@ export async function markAsRead(
   );
 }
 
+export async function markAsUnread(
+  session: Session,
+  mailbox: string,
+  uid: number | string
+): Promise<void> {
+  await requestJson<{ message: string }>(
+    `/mail/box/${encodeURIComponent(mailbox)}/${encodeURIComponent(String(uid))}/unread`,
+    { method: "PATCH" },
+    session.token
+  );
+}
+
+export async function setFlagged(
+  session: Session,
+  mailbox: string,
+  uid: number | string,
+  flagged: boolean
+): Promise<void> {
+  await requestJson<{ message: string }>(
+    `/mail/box/${encodeURIComponent(mailbox)}/${encodeURIComponent(String(uid))}/flag`,
+    { method: "PATCH", body: JSON.stringify({ flagged }) },
+    session.token
+  );
+}
+
 export async function listFolders(session: Session): Promise<MailFolder[]> {
   const result = await requestJson<{ folders: MailFolder[] }>("/mail/folders", {}, session.token);
   return result.folders;
@@ -158,18 +184,6 @@ export async function moveMail(
   await requestJson(
     `/mail/box/${encodeURIComponent(mailbox)}/${encodeURIComponent(String(uid))}/move`,
     { method: "PATCH", body: JSON.stringify({ target }) },
-    session.token
-  );
-}
-
-export async function markAsUnread(
-  session: Session,
-  mailbox: string,
-  uid: number | string
-): Promise<void> {
-  await requestJson<{ message: string }>(
-    `/mail/box/${encodeURIComponent(mailbox)}/${encodeURIComponent(String(uid))}/unread`,
-    { method: "PATCH" },
     session.token
   );
 }
@@ -221,6 +235,7 @@ export type ManagedUser = {
   name?: string;
   signature?: string;
   canReceiveMail?: boolean;
+  isAdmin?: boolean;
 };
 
 export async function getUsers(session: Session): Promise<ManagedUser[]> {
@@ -230,13 +245,14 @@ export async function getUsers(session: Session): Promise<ManagedUser[]> {
 export async function createUser(
   session: Session,
   username: string,
-  password: string
+  password: string,
+  isAdmin = false
 ): Promise<void> {
   await requestJson(
     "/users/create",
     {
       method: "POST",
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, isAdmin }),
     },
     session.token
   );
@@ -249,15 +265,36 @@ export async function deleteUser(session: Session, username: string): Promise<vo
     session.token
   );
 }
-// ---------- own settings ----------
+
+export async function setUserAdmin(
+  session: Session,
+  username: string,
+  isAdmin: boolean
+): Promise<void> {
+  await requestJson(
+    `/users/${encodeURIComponent(username)}/admin`,
+    { method: "PATCH", body: JSON.stringify({ isAdmin }) },
+    session.token
+  );
+}
+
+// ---------- own settings (incl. forwarding + autoresponder) ----------
 
 export async function getMySettings(session: Session): Promise<UserSettings> {
   return requestJson<UserSettings>("/settings/me", {}, session.token);
 }
 
+export type MySettingsUpdate = {
+  name?: string;
+  signature?: string;
+  vacationMode?: boolean;
+  vacationMessage?: string;
+  forwardingAddress?: string | null;
+};
+
 export async function updateMySettings(
   session: Session,
-  updates: { name?: string; signature?: string }
+  updates: MySettingsUpdate
 ): Promise<UserSettings> {
   return requestJson<UserSettings>(
     "/settings/me",
@@ -266,8 +303,54 @@ export async function updateMySettings(
   );
 }
 
+export async function getMyUsage(session: Session): Promise<MailboxUsage> {
+  return requestJson<MailboxUsage>("/settings/me/usage", {}, session.token);
+}
 
-// ---------- site-wide settings (root only) ----------
+// ---------- own quick-reply templates ----------
+
+export async function getMyTemplates(session: Session): Promise<MailTemplate[]> {
+  const result = await requestJson<{ templates: MailTemplate[] }>(
+    "/settings/me/templates",
+    {},
+    session.token
+  );
+  return result.templates;
+}
+
+export async function createMyTemplate(
+  session: Session,
+  name: string,
+  body: string
+): Promise<MailTemplate> {
+  return requestJson<MailTemplate>(
+    "/settings/me/templates",
+    { method: "POST", body: JSON.stringify({ name, body }) },
+    session.token
+  );
+}
+
+export async function updateMyTemplate(
+  session: Session,
+  id: string,
+  updates: { name?: string; body?: string }
+): Promise<MailTemplate> {
+  return requestJson<MailTemplate>(
+    `/settings/me/templates/${encodeURIComponent(id)}`,
+    { method: "PATCH", body: JSON.stringify(updates) },
+    session.token
+  );
+}
+
+export async function deleteMyTemplate(session: Session, id: string): Promise<void> {
+  await requestJson(
+    `/settings/me/templates/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+    session.token
+  );
+}
+
+// ---------- site-wide settings (admins only) ----------
 
 export async function getGlobalSettings(session: Session): Promise<GlobalSettings> {
   return requestJson<GlobalSettings>("/settings/global", {}, session.token);
@@ -283,21 +366,3 @@ export async function updateGlobalSettings(
     session.token
   );
 }
-
-// ---------- own mail forwarding ----------
-
-export async function getMyForwarding(session: Session): Promise<ForwardingSettings> {
-  return requestJson<ForwardingSettings>("/settings/me/forwarding", {}, session.token);
-}
-
-export async function updateMyForwarding(
-  session: Session,
-  forwardingAddress: string | null
-): Promise<ForwardingSettings> {
-  return requestJson<ForwardingSettings>(
-    "/settings/me/forwarding",
-    { method: "PATCH", body: JSON.stringify({ forwardingAddress }) },
-    session.token
-  );
-}
-
