@@ -45,7 +45,12 @@ it's deployed).
   business "thanks for your inquiry" reply to start from. Implemented
   server-side as a Dovecot Sieve script (`~/.dovecot.sieve`), so it fires
   immediately on delivery - even if nobody's logged into the web UI - and
-  mail always stays in the account too, it's never a pure redirect
+  mail always stays in the account too, it's never a pure redirect.
+  Saving it also checks that the generated script actually compiles and
+  that this Dovecot install is wired for Sieve at all (`mail_plugins` +
+  `plugin.sieve` on the LMTP protocol) - a common one-time setup step to
+  miss on a fresh manual install - and reports a specific problem instead
+  of a silent no-op if either check fails
 - **Storage usage** - "Einstellungen" shows how much of the mailbox's
   quota is currently used, with a warning color as it fills up
 - **Mail templates / quick replies** - save reusable text snippets and
