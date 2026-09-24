@@ -7,6 +7,7 @@ import {
   deleteEmail,
   markMailRead,
   markMailUnread,
+  flagEmail,
   getFolders,
   createMailFolder,
   moveEmail,
@@ -20,6 +21,7 @@ router.get("/attachment/:mailbox/:uid/:index", downloadAttachment);
 router.delete("/delete", deleteEmail);
 router.patch("/box/:mailbox/:uid/read", markMailRead);
 router.patch("/box/:mailbox/:uid/unread", markMailUnread);
+router.patch("/box/:mailbox/:uid/flag", flagEmail);
 router.patch("/box/:mailbox/:uid/move", moveEmail);
 router.get("/folders", getFolders);
 router.post("/folders", createMailFolder);

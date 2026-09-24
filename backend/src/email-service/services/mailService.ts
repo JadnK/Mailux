@@ -29,6 +29,7 @@ export type MailSummary = {
   html?: string;
   attachments: MailAttachmentMeta[];
   seen: boolean;
+  flagged: boolean;
 };
 
 export type MailboxResult = {
@@ -101,6 +102,7 @@ async function parseMessage(rawPart: any): Promise<MailSummary> {
     html: typeof parsed.html === "string" ? parsed.html : "",
     attachments: toAttachmentMeta(parsed.attachments),
     seen: false, // overwritten by the caller, which has the IMAP flags
+    flagged: false, // overwritten by the caller, which has the IMAP flags
   };
 }
 
@@ -148,7 +150,12 @@ async function fetchMailbox(
         const allParts = msg.parts.find((p: any) => p.which === "");
         const summary = await parseMessage(allParts.body);
         const flags: string[] = msg.attributes?.flags ?? [];
-        return { ...summary, uid: msg.attributes.uid, seen: flags.includes("\\Seen") };
+        return {
+          ...summary,
+          uid: msg.attributes.uid,
+          seen: flags.includes("\\Seen"),
+          flagged: flags.includes("\\Flagged"),
+        };
       })
     );
 
@@ -216,6 +223,28 @@ export const markAsRead = async (
   try {
     await connection.openBox(mailbox);
     await connection.addFlags(mailUid, "\\Seen");
+  } finally {
+    connection.end();
+  }
+};
+
+export const setFlagged = async (
+  username: string,
+  password: string,
+  mailbox: string,
+  mailUid: number,
+  flagged: boolean
+): Promise<void> => {
+  const imapConfig = getImapConfig(username, password);
+  const connection = await imaps.connect(imapConfig);
+
+  try {
+    await connection.openBox(mailbox);
+    if (flagged) {
+      await connection.addFlags(mailUid, "\\Flagged");
+    } else {
+      await connection.delFlags(mailUid, "\\Flagged");
+    }
   } finally {
     connection.end();
   }

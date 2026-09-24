@@ -8,6 +8,7 @@ import {
   deleteMail,
   markAsRead,
   markAsUnread,
+  setFlagged,
   listFolders,
   createFolder,
   moveMail,
@@ -129,6 +130,24 @@ export const markMailUnread = async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error("markMailUnread error:", err);
     res.status(500).json({ message: "Failed to mark mail as unread" });
+  }
+};
+
+export const flagEmail = async (req: AuthRequest, res: Response) => {
+  try {
+    const { username, password } = credentials(req);
+    const { mailbox, uid } = req.params;
+    const { flagged } = req.body as { flagged?: boolean };
+
+    if (typeof flagged !== "boolean") {
+      return res.status(400).json({ message: "flagged (boolean) required" });
+    }
+
+    await setFlagged(username, password, mailbox, Number(uid), flagged);
+    res.status(200).json({ message: flagged ? "Marked as flagged" : "Unflagged" });
+  } catch (err) {
+    console.error("flagEmail error:", err);
+    res.status(500).json({ message: "Failed to update flag" });
   }
 };
 
