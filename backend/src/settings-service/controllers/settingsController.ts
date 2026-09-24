@@ -141,6 +141,9 @@ export const changeMyPassword = async (req: AuthRequest, res: Response) => {
     if (newPassword.length < 8) {
       return res.status(400).json({ message: "Neues Passwort muss mindestens 8 Zeichen haben" });
     }
+    if (/[\r\n\0]/.test(newPassword)) {
+      return res.status(400).json({ message: "Neues Passwort enthält ungültige Zeichen" });
+    }
 
     const user = username(req);
 

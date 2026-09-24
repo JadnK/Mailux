@@ -114,6 +114,9 @@ export const createUser = async (req: AuthRequest, res: Response) => {
         message: "Password must be at least 8 characters",
       });
     }
+    if (/[\r\n\0]/.test(password)) {
+      return res.status(400).json({ message: "Password contains invalid characters" });
+    }
 
     const success = await userService.createUser(username, password, { isAdmin: !!isAdmin });
     if (!success) {

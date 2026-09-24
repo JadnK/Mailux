@@ -61,6 +61,16 @@ function runPrivileged(command: string, args: string[]): void {
 
 /** Sets a system user's password via chpasswd's stdin, never via argv/echo. */
 export function setSystemPassword(username: string, password: string): void {
+  // chpasswd reads "user:password" lines from stdin, one account per line.
+  // If `password` itself contained a newline, an attacker could smuggle in
+  // a second "otherUser:newPassword" line and silently reset a *different*
+  // account's password (e.g. root's) through this one call. Every caller
+  // should already be rejecting this, but enforce it here too as a
+  // backstop so a future call site can't reintroduce the bug.
+  if (/[\r\n\0]/.test(password)) {
+    throw new Error("Password contains invalid characters");
+  }
+
   const result = spawnSync("chpasswd", [], {
     input: `${username}:${password}\n`,
     stdio: ["pipe", "pipe", "pipe"],
