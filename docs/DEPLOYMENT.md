@@ -68,7 +68,7 @@ Run everything below as root.
 ```bash
 apt update
 apt install -y postfix postfix-pcre \
-  dovecot-imapd dovecot-lmtpd dovecot-core \
+  dovecot-imapd dovecot-lmtpd dovecot-core dovecot-sieve \
   openssl \
   libpam0g-dev build-essential python3
 ```
@@ -142,6 +142,35 @@ protocols = imap lmtp
 ```conf
 mail_location = maildir:~/Maildir
 ```
+
+### Dovecot: Sieve (server-side forwarding + autoresponder)
+
+Mailux's "Weiterleitung" and "Autoresponder" account settings work by
+writing a `~/.dovecot.sieve` script per user, run by Dovecot's LMTP
+delivery via the Pigeonhole Sieve plugin (`dovecot-sieve`, installed
+above). This matters specifically because `local_transport` above points
+at Dovecot LMTP, not Postfix's own `local(8)` - so a classic `~/.forward`
+file (the local(8) convention) is never consulted here, and Sieve is the
+correct hook for this deployment.
+
+`/etc/dovecot/conf.d/20-lmtp.conf`:
+
+```conf
+protocol lmtp {
+  mail_plugins = $mail_plugins sieve
+}
+```
+
+`/etc/dovecot/conf.d/90-sieve.conf` (create it if it doesn't exist yet):
+
+```conf
+plugin {
+  sieve = ~/.dovecot.sieve
+}
+```
+
+Dovecot recompiles a changed `.dovecot.sieve` automatically on the next
+delivery - no extra step needed after Mailux writes one.
 
 ### Dovecot: auth + LMTP sockets for Postfix
 

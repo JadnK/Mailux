@@ -4,25 +4,34 @@ import {
   modifyGlobalSettings,
   fetchMySettings,
   modifyMySettings,
-  fetchMyForwarding,
-  modifyMyForwarding,
+  fetchMyUsage,
+  fetchMyTemplates,
+  addMyTemplate,
+  editMyTemplate,
+  removeMyTemplate,
 } from "../controllers/settingsController.js";
-import { requireRoot } from "../../middleware/auth.js";
+import { requireAdmin } from "../../middleware/auth.js";
 
 const router = Router();
 
-// Own settings - any authenticated user, scoped to themselves via the
-// session (never a :username path param, so there's no way to read or
-// edit someone else's settings by editing the URL).
+// Own settings (including forwarding + autoresponder) - any authenticated
+// user, scoped to themselves via the session (never a :username path
+// param, so there's no way to read or edit someone else's settings by
+// editing the URL).
 router.get("/me", fetchMySettings);
 router.patch("/me", modifyMySettings);
 
-// Own mail forwarding - same self-scoping as above.
-router.get("/me/forwarding", fetchMyForwarding);
-router.patch("/me/forwarding", modifyMyForwarding);
+// Own mailbox storage usage.
+router.get("/me/usage", fetchMyUsage);
 
-// Site-wide settings - root only.
-router.get("/global", requireRoot, fetchGlobalSettings);
-router.patch("/global", requireRoot, modifyGlobalSettings);
+// Own quick-reply templates.
+router.get("/me/templates", fetchMyTemplates);
+router.post("/me/templates", addMyTemplate);
+router.patch("/me/templates/:id", editMyTemplate);
+router.delete("/me/templates/:id", removeMyTemplate);
+
+// Site-wide settings - admins only.
+router.get("/global", requireAdmin, fetchGlobalSettings);
+router.patch("/global", requireAdmin, modifyGlobalSettings);
 
 export default router;
