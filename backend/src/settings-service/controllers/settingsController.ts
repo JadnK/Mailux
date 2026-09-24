@@ -17,7 +17,7 @@ import {
 } from "../services/mailRoutingService.js";
 import { getMailboxUsageBytes } from "../services/storageService.js";
 import { authenticateUser, setSystemPassword } from "../../user-service/services/userService.js";
-import { updateSessionPassword } from "../../auth/sessionStore.js";
+import { updateSessionPassword, destroyOtherSessions } from "../../auth/sessionStore.js";
 
 function username(req: AuthRequest): string {
   if (!req.user) {
@@ -160,7 +160,14 @@ export const changeMyPassword = async (req: AuthRequest, res: Response) => {
     // without this the user would be silently logged out mid-session.
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : null;
-    if (token) updateSessionPassword(token, newPassword);
+    if (token) {
+      updateSessionPassword(token, newPassword);
+      // Any other session for this account (e.g. a token left on a shared
+      // computer, or one that leaked some other way) should not keep
+      // working past a password change the user just made specifically to
+      // lock that out.
+      destroyOtherSessions(user, token);
+    }
 
     res.json({ message: "Passwort geändert" });
   } catch (err) {

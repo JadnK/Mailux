@@ -78,6 +78,12 @@ export async function login(username: string, password: string): Promise<Session
   });
 }
 
+// Revokes the session token server-side, so it can't keep being used after
+// logout (e.g. if it leaked, or was left behind on a shared computer).
+export async function logout(session: Session): Promise<void> {
+  return requestJson<void>("/logout", { method: "POST" }, session.token);
+}
+
 export async function getMailbox(session: Session, mailbox: string): Promise<MailboxResponse> {
   return requestJson<MailboxResponse>(
     `/mail/box/${encodeURIComponent(mailbox)}`,

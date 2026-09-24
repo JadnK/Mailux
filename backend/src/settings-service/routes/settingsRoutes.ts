@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import {
   fetchGlobalSettings,
   modifyGlobalSettings,
@@ -15,6 +16,19 @@ import { requireAdmin } from "../../middleware/auth.js";
 
 const router = Router();
 
+// changeMyPassword re-verifies the caller's *current* password via PAM
+// before accepting a new one - the same class of risk as /login (PAM can
+// authenticate as root or any other sudo account), and reachable by
+// anyone holding a valid session token even without already knowing the
+// account's real password. Rate limit it the same way /login is.
+const passwordChangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many attempts. Please try again later." },
+});
+
 // Own settings (including forwarding + autoresponder) - any authenticated
 // user, scoped to themselves via the session (never a :username path
 // param, so there's no way to read or edit someone else's settings by
@@ -23,7 +37,7 @@ router.get("/me", fetchMySettings);
 router.patch("/me", modifyMySettings);
 
 // Own password - re-verifies the current one via PAM before changing it.
-router.patch("/me/password", changeMyPassword);
+router.patch("/me/password", passwordChangeLimiter, changeMyPassword);
 
 // Own mailbox storage usage.
 router.get("/me/usage", fetchMyUsage);

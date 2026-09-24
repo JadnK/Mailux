@@ -59,6 +59,21 @@ export function destroySession(token: string): void {
 }
 
 /**
+ * Destroys every other active session belonging to this username, keeping
+ * only `keepToken` alive - called right after a self-service password
+ * change so a token that leaked or was left behind before the change
+ * (a shared/public computer, a stolen device, etc.) is cut off immediately
+ * instead of continuing to work for up to the full session TTL.
+ */
+export function destroyOtherSessions(username: string, keepToken: string): void {
+  for (const [token, record] of sessions) {
+    if (record.username === username && token !== keepToken) {
+      sessions.delete(token);
+    }
+  }
+}
+
+/**
  * Updates the password kept for an already-active session - used right
  * after a successful self-service password change, so the session that
  * just changed it keeps working (IMAP/SMTP calls use this password on

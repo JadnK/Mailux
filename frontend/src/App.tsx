@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { LoginPanel } from "./components/LoginPanel";
 import { MailShell } from "./components/MailShell";
+import { logout as logoutRequest } from "./api/mailClient";
 import type { Session } from "./types/mail";
 
 function readSavedSession(): Session | null {
@@ -36,6 +37,13 @@ export default function App() {
   }
 
   function handleLogout() {
+    // Best effort: revoke the token server-side, but log the user out
+    // locally regardless of whether that call succeeds - a network error
+    // or an already-expired token should never leave someone stuck unable
+    // to leave a broken session.
+    if (session) {
+      logoutRequest(session).catch(() => {});
+    }
     localStorage.removeItem("mailux.session");
     setSession(null);
   }
