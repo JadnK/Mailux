@@ -16,9 +16,10 @@
 ## What it is
 
 Mailux turns a plain Postfix + Dovecot mail server into something you can
-actually manage from a browser: a clean, dark, three-pane inbox with all
-your real IMAP folders, attachments, CC/BCC, and - for the `root` account
-only - creating and removing mailboxes, all without ever touching SSH.
+actually manage from a browser: a dark, indigo-accented three-pane inbox
+with all your real IMAP folders, attachments, CC/BCC, and - for any
+account with sudo rights - creating and removing mailboxes, all without
+ever touching SSH.
 
 Mailboxes **are** Linux system accounts. There's no separate user database:
 Mailux authenticates against PAM, reads `/etc/passwd` to find accounts with
@@ -37,9 +38,19 @@ it's deployed).
   folders from the sidebar, drag a message onto any folder to move it, or
   right-click a message for a context menu (move, mark read/unread,
   delete)
-- **Per-account mail forwarding** - optionally forward incoming mail to
-  another address from "Einstellungen"; mail also stays in the account
-  it's configured on, it isn't a redirect
+- **Per-account forwarding + autoresponder** - optionally forward incoming
+  mail to another address and/or send an automatic out-of-office reply,
+  both from "Einstellungen". Implemented server-side as a Dovecot Sieve
+  script (`~/.dovecot.sieve`), so it fires immediately on delivery - even
+  if nobody's logged into the web UI - and mail always stays in the
+  account too, it's never a pure redirect
+- **Storage usage** - "Einstellungen" shows how much of the mailbox's
+  quota is currently used, with a warning color as it fills up
+- **Mail templates / quick replies** - save reusable text snippets and
+  insert one into a message with a click from the compose toolbar
+- **Star important mail** - flag a message from the list, the reader, or
+  the right-click menu (backed by the IMAP `\Flagged` flag), and filter
+  the list down to starred-only
 - **Attachments** - drag-and-drop or pick files onto a new message, and
   download attachments straight from a received mail
 - **Compose & reply** - Gmail-style inline reply under the open message
@@ -57,11 +68,15 @@ it's deployed).
   unread-only
 - **Keyboard shortcuts** - `c` starts a new message, `/` jumps to search,
   `Escape` closes the compose window
-- **root is an administrator, not a mailbox** - logging in as root lands on
-  a dedicated screen with exactly two things: user management (creating
-  and removing mailboxes) and site-wide settings. No folders, no compose,
-  no reading anyone's mail through the UI - everything else in the app is
-  the same for every other account
+- **Admin rights follow sudo, not the `root` username** - any account in
+  the server's `sudo`/`wheel` group gets a "Verwaltung" section inside the
+  normal mail client for user management (creating, deleting and
+  granting/revoking admin rights) and site-wide settings. Unlike the old
+  root-only model, an admin account is still a completely normal, usable
+  mailbox - granting someone admin rights doesn't take their inbox away.
+  Membership is checked live against `/etc/group` on every request, so
+  revoking sudo takes effect immediately. Nobody can remove their own
+  admin rights or delete their own account
 - **Session-based auth** - PAM login issues a short opaque session token;
   your mail password never sits in browser storage in plaintext (see
   [`docs/SECURITY.md`](docs/SECURITY.md))
