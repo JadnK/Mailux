@@ -298,7 +298,24 @@ your setup).
 
 ```bash
 apt install -y opendkim opendkim-tools
+```
 
+Check first whether a DKIM key already exists (e.g. from an earlier setup
+attempt, or one a hosting provider created by default) before generating
+a new one - the selector doesn't have to be `mail`, and if a key is
+already there and referenced correctly you don't want two competing
+keys:
+
+```bash
+ls -la /etc/opendkim/keys/example.com/ 2>/dev/null
+cat /etc/opendkim/KeyTable /etc/opendkim/SigningTable 2>/dev/null
+```
+
+If nothing exists yet, generate one (selector `mail` below is just a
+convention - any short string works, it just has to match everywhere
+else below and in the DNS record name):
+
+```bash
 mkdir -p /etc/opendkim/keys/example.com
 cd /etc/opendkim/keys/example.com
 opendkim-genkey -s mail -d example.com
@@ -318,30 +335,137 @@ mail._domainkey.example.com example.com:mail:/etc/opendkim/keys/example.com/mail
 *@example.com mail._domainkey.example.com
 ```
 
-`/etc/opendkim/TrustedHosts`:
+`/etc/opendkim/TrustedHosts` - list both the server's hostname *and* its
+plain IP address. OpenDKIM decides whether to sign a message by checking
+the connecting client against this list, and relying on hostname-only
+entries here has been unreliable in practice:
 
 ```
 127.0.0.1
+::1
 localhost
+203.0.113.10
 mail.example.com
 example.com
 ```
+
+`/etc/opendkim.conf` - `apt install opendkim` ships a config with
+logging and a socket already set up, but signing itself is **not**
+enabled out of the box: `Mode`, `KeyTable`, `SigningTable`,
+`InternalHosts` and `ExternalIgnoreList` are commented out or missing
+entirely by default. OpenDKIM will start fine and happily verify
+incoming mail's signatures without ever signing anything outgoing, with
+no error anywhere - make sure these lines are actually active
+(uncommented):
+
+```
+Mode                    sv
+KeyTable                refile:/etc/opendkim/KeyTable
+SigningTable            refile:/etc/opendkim/SigningTable
+InternalHosts           /etc/opendkim/TrustedHosts
+ExternalIgnoreList      /etc/opendkim/TrustedHosts
+```
+
+The `refile:` prefix on `SigningTable` matters: without it, OpenDKIM
+reads the file as an exact-string lookup instead of a wildcard pattern
+match, so `*@example.com` is taken completely literally and never
+matches a real address like `info@example.com`. Mail goes out unsigned
+and nothing rejects or errors - the only trace is `no signing table
+match for 'info@example.com'` in the mail log (see the diagnosis
+section below), which is easy to miss until a recipient's "Show
+original" shows DKIM as simply absent.
 
 Hook Postfix up to OpenDKIM as a milter, in `/etc/postfix/main.cf`:
 
 ```cf
 milter_default_action = accept
 milter_protocol = 6
-smtpd_milters = unix:/opendkim/opendkim.sock
+smtpd_milters = inet:localhost:8891
 non_smtpd_milters = $smtpd_milters
 ```
 
-The socket path depends on your OpenDKIM config - check `Socket` in
-`/etc/opendkim.conf` (often `/run/opendkim/opendkim.sock`).
+Use a TCP socket (`inet:localhost:8891`) here rather than OpenDKIM's
+default Unix socket, even though a fresh `opendkim.conf` usually has
+`Socket local:/run/opendkim/opendkim.sock`. Postfix's `smtpd` and
+`submission` services normally run chrooted into `/var/spool/postfix`,
+and a chrooted process cannot open a filesystem path that lives outside
+that jail - so a Unix socket under `/run/opendkim/` fails to connect
+(`warning: connect to Milter service unix:/run/opendkim/opendkim.sock:
+No such file or directory`). Because `milter_default_action = accept`,
+that failure is silent: mail keeps flowing completely normally, just
+without ever being signed, and nothing in Postfix's logs flags it as a
+misconfiguration. A TCP socket sidesteps the chroot question entirely.
 
-Publish the DKIM public key as a DNS TXT record - it's printed to
-`/etc/opendkim/keys/example.com/mail.txt`. SPF/DMARC go in DNS as shown
-above.
+Set the matching line in `/etc/opendkim.conf`:
+
+```
+Socket                  inet:8891@localhost
+```
+
+Restart both, then confirm the milter is actually listening and wired
+in before moving on:
+
+```bash
+systemctl restart opendkim postfix
+ss -tlnp | grep 8891                # should show 127.0.0.1:8891
+postconf smtpd_milters              # should echo inet:localhost:8891
+```
+
+Publish the DKIM public key as a DNS TXT record. It's printed
+(pre-formatted for the right selector/domain) to
+`/etc/opendkim/keys/example.com/mail.txt`:
+
+```bash
+cat /etc/opendkim/keys/example.com/mail.txt
+```
+
+That file is normally two quoted strings split across two lines purely
+because of DNS's 255-character-per-string limit - join them into a
+single value with nothing extra at the seam (no added space, no
+duplicated character):
+
+```
+v=DKIM1; h=sha256; k=rsa; p=<first quoted string immediately followed by the second, no separator>
+```
+
+Enter that as one TXT record at host `mail._domainkey` (i.e.
+`mail._domainkey.example.com`) with your DNS provider - copy-paste it
+rather than retyping it; a single wrong or duplicated character
+anywhere in the key silently invalidates the whole signature and the
+mail log won't say why. Once it's saved, verify against a public
+resolver rather than your own server's (which may have the old value
+cached until its TTL expires), and compare it character-for-character
+against what you entered:
+
+```bash
+dig @1.1.1.1 +short TXT mail._domainkey.example.com
+```
+
+### Diagnosing DKIM once everything above looks right
+
+If mail still goes out unsigned despite all of the above, add `LogWhy
+yes` to `/etc/opendkim.conf` (then `systemctl restart opendkim`) -
+OpenDKIM will then log its actual reasoning for every message instead of
+staying silent, which is far faster than guessing:
+
+```bash
+grep -i opendkim /var/log/mail.log | tail -20
+```
+
+Look for `DKIM-Signature field added (s=..., d=...)` on success, or a
+specific reason if it's still not signing (`no signing table match for
+'...'` is the wildcard/`refile:` issue above; other messages point
+elsewhere).
+
+To confirm the whole chain end to end, send a real message to a Gmail
+address and open it there via the three-dot menu → "Show original" /
+"Original anzeigen" - it lists the SPF, DKIM and DMARC verdicts
+individually. SPF/DMARC passing while DKIM is missing entirely (not
+`FAIL`, just not listed at all) means the signature was never added in
+the first place - that points back at OpenDKIM's own config (Mode /
+KeyTable / SigningTable / the milter connection), not at the DNS record,
+even though a missing signature and an invalid one can look similar at
+first glance.
 
 ### Restart everything, then verify
 
