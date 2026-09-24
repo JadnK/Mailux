@@ -1586,14 +1586,6 @@ textarea {
   background: var(--border);
 }
 
-/* ============ settings: forwarding section ============ */
-
-.settings-form--forwarding {
-  margin-top: 30px;
-  padding-top: 26px;
-  border-top: 1px solid var(--border);
-}
-
 .settings-section-heading h2 {
   margin: 0 0 4px;
   font-family: var(--font-display);
@@ -1869,4 +1861,109 @@ textarea {
 .rich-text-template-select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* ============ settings: cards + sudo-admin/autoresponder rework ============ */
+
+.settings-card {
+  padding: 22px 24px;
+  margin-bottom: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.settings-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.settings-section-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  margin-top: 1px;
+}
+
+.settings-no-mailbox-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.settings-no-mailbox-notice strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.settings-subsection-divider {
+  height: 1px;
+  margin: 4px 0 2px;
+  background: var(--border);
+}
+
+.settings-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -6px;
+}
+
+.preset-button {
+  padding: 7px 13px;
+  border-radius: 99px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.preset-button:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.settings-date-row {
+  display: flex;
+  gap: 14px;
+}
+.settings-date-row label {
+  flex: 1;
+  min-width: 0;
+}
+.settings-date-row input[type="date"] {
+  color-scheme: dark;
+}
+
+/* ============ MailShell: admin-only account with no mailbox ============ */
+
+.no-access-state {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.no-access-state h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.no-access-state p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.6;
 }
