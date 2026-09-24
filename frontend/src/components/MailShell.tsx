@@ -256,7 +256,12 @@ type ContextMenuState = {
 
 export function MailShell({ session, onLogout }: MailShellProps) {
   const [activeFolder, setActiveFolder] = useState<FolderItem>(SYSTEM_FOLDERS[0]);
-  const [activeView, setActiveView] = useState<"mail" | "settings" | "admin">("mail");
+  // A sudo-only admin with no mailbox of their own has nothing to read in
+  // "mail" - land them on Verwaltung (if they're admin) or Einstellungen
+  // instead, and never on the empty inbox view.
+  const [activeView, setActiveView] = useState<"mail" | "settings" | "admin">(
+    session.hasMailbox ? "mail" : session.isAdmin ? "admin" : "settings"
+  );
   const [mySettings, setMySettings] = useState<UserSettings | null>(null);
   const [mails, setMails] = useState<Mail[]>([]);
   const [folderExists, setFolderExists] = useState(true);
@@ -365,20 +370,27 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   }
 
   useEffect(() => {
-    loadFolder(SYSTEM_FOLDERS[0]);
-    loadFolders();
+    // getMySettings/getMyTemplates still make sense without a mailbox
+    // (password change lives in Einstellungen too) - only the IMAP-backed
+    // folder loading needs an actual mailbox to exist.
+    if (session.hasMailbox) {
+      loadFolder(SYSTEM_FOLDERS[0]);
+      loadFolders();
+    }
     getMySettings(session)
       .then(setMySettings)
       .catch(() => {
         // Non-fatal - the sidebar just falls back to the username/initials
         // until settings can be loaded (e.g. retried by opening Einstellungen).
       });
-    getMyTemplates(session)
-      .then(setTemplates)
-      .catch(() => {
-        // Non-fatal - the compose toolbar just skips the "insert template"
-        // dropdown until this can be retried.
-      });
+    if (session.hasMailbox) {
+      getMyTemplates(session)
+        .then(setTemplates)
+        .catch(() => {
+          // Non-fatal - the compose toolbar just skips the "insert template"
+          // dropdown until this can be retried.
+        });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -448,6 +460,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
       if (composeOpen) return;
+      if (!session.hasMailbox) return;
 
       const target = event.target as HTMLElement | null;
       const isTyping =
@@ -469,7 +482,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [composeOpen, draftHtml]);
+  }, [composeOpen, draftHtml, session.hasMailbox]);
 
   async function switchFolder(folder: FolderItem) {
     setActiveView("mail");
@@ -659,6 +672,32 @@ export function MailShell({ session, onLogout }: MailShellProps) {
 
   const selectedAddress = selectedMail ? parseAddress(selectedMail.from || "") : null;
 
+  // Defensive fallback: an account that is neither an admin nor has a
+  // mailbox has nothing this app can show it. Shouldn't normally happen
+  // (every account Mailux manages is one or the other) but a pre-existing
+  // system account with a valid PAM password and neither could log in.
+  if (!session.hasMailbox && !session.isAdmin) {
+    // Reuses the login screen's full-viewport centered layout (a single
+    // <main> inside the mail-app grid would only fill its first column,
+    // not the page) - and it visually ties this dead-end state back to
+    // the login screen it most resembles.
+    return (
+      <div className="login-screen">
+        <div className="login-glow" />
+        <div className="login-card no-access-state">
+          <h1>Kein Zugriff eingerichtet</h1>
+          <p>
+            Für <strong>{session.username}</strong> ist weder eine Mailbox noch ein
+            Admin-Zugang (sudo) eingerichtet. Wende dich an eine Person mit Admin-Rechten.
+          </p>
+          <button className="ghost-button" onClick={onLogout}>
+            Abmelden
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`mail-app ${activeView !== "mail" ? "mail-app--single" : ""}`}>
       <aside className="sidebar">
@@ -679,21 +718,23 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           </button>
         </div>
 
-        <button
-          className="compose-button"
-          onClick={() => {
-            setCompose({ ...EMPTY_COMPOSE, html: draftHtml() });
-            setShowCcBcc(false);
-            setReplyOpen(false);
-            setComposeOpen(true);
-          }}
-          title="Neue Nachricht (c)"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Neue Nachricht
-        </button>
+        {session.hasMailbox && (
+          <button
+            className="compose-button"
+            onClick={() => {
+              setCompose({ ...EMPTY_COMPOSE, html: draftHtml() });
+              setShowCcBcc(false);
+              setReplyOpen(false);
+              setComposeOpen(true);
+            }}
+            title="Neue Nachricht (c)"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Neue Nachricht
+          </button>
+        )}
 
         <button
           className={`secondary-nav-button ${activeView === "settings" ? "active" : ""}`}
@@ -720,6 +761,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           </button>
         )}
 
+        {session.hasMailbox && (
         <nav className="folder-list" aria-label="Mail folders">
           {allFolders.map((folder) => {
             const isActive = activeView === "mail" && activeFolder.mailbox === folder.mailbox;
@@ -800,6 +842,7 @@ export function MailShell({ session, onLogout }: MailShellProps) {
           )}
           {folderError && <p className="folder-error">{folderError}</p>}
         </nav>
+        )}
       </aside>
 
       {activeView === "mail" && (

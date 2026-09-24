@@ -44,10 +44,13 @@ export default function App() {
     return <LoginPanel onLogin={handleLogin} sessionExpired={sessionExpired} />;
   }
 
-  // Every account is a real mailbox now, including admins (isAdmin - based
-  // on system sudo/wheel membership, see the backend's requireAdmin) -
-  // admin-only tools (user management, site settings) live inside MailShell
-  // itself, behind a "Verwaltung" nav entry, instead of replacing the mail
-  // client entirely the way the old root-only AdminShell used to.
+  // Most admin accounts are real mailboxes too (isAdmin - based on system
+  // sudo/wheel membership, see the backend's requireAdmin), so admin-only
+  // tools (user management, site settings) live inside MailShell itself,
+  // behind a "Verwaltung" nav entry, instead of replacing the mail client
+  // entirely the way the old root-only AdminShell used to. A sudo account
+  // that was never created through Mailux (hasMailbox: false) has no
+  // Postfix/Dovecot mailbox of its own, though - MailShell keeps the mail
+  // UI out of its way entirely in that case.
   return <MailShell session={session} onLogout={handleLogout} />;
 }
