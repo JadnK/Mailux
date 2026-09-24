@@ -1322,7 +1322,10 @@ textarea {
  * is a single child and would just collapse into the grid's first track,
  * the same trap .mail-app's own grid has for a lone child. */
 .settings-grid {
-  max-width: 1080px;
+  /* Fills the reader panel's full width (unlike .settings-body above) -
+   * minmax's lower bound is what keeps a card from ever getting
+   * uncomfortably narrow; there's no upper cap here on purpose. */
+  max-width: none;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   align-items: start;
