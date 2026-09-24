@@ -67,6 +67,67 @@ function checkSieveScript(filePath: string): string | null {
   return null;
 }
 
+/**
+ * Checks whether Dovecot's LMTP delivery is actually wired up for Sieve
+ * at all - the two one-time manual steps in docs/DEPLOYMENT.md's
+ * "Dovecot: Sieve" section (mail_plugins for the lmtp protocol, and the
+ * plugin's own sieve path). If either was never done (easy to miss on a
+ * manual install - there's no installer that does it for you), Mailux
+ * happily keeps writing a perfectly valid .dovecot.sieve on every save,
+ * and Dovecot never even looks at it: forwarding/the autoresponder do
+ * nothing, with a valid script and no compile error either - this is a
+ * more common real cause of "I did everything right and it still
+ * doesn't work" than a broken script.
+ *
+ * Uses `doveconf` to ask Dovecot itself, the same way it would resolve
+ * these settings for a real LMTP delivery, rather than trying to parse
+ * config files by hand. Returns a problem description, or null when both
+ * checks pass (or `doveconf` isn't reachable, in which case this is
+ * skipped rather than treated as a failure).
+ */
+function checkDovecotSieveConfigured(): string | null {
+  let mailPlugins: string;
+  let sievePluginPath: string;
+
+  try {
+    mailPlugins = execFileSync("doveconf", ["-f", "protocol=lmtp", "-h", "mail_plugins"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    sievePluginPath = execFileSync("doveconf", ["-h", "sieve"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  } catch {
+    // doveconf isn't on PATH, or couldn't be run at all (e.g. this isn't
+    // actually running on the mail server) - can't check, so don't
+    // pretend to have an answer either way.
+    return null;
+  }
+
+  const problems: string[] = [];
+  if (!/(^|\s)sieve(\s|$)/.test(mailPlugins)) {
+    problems.push(
+      'das Sieve-Plugin ist in Dovecots LMTP-Konfiguration nicht aktiviert (mail_plugins in ' +
+        '/etc/dovecot/conf.d/20-lmtp.conf sollte "sieve" enthalten - aktuell: ' +
+        `${mailPlugins ? `"${mailPlugins}"` : "leer"})`
+    );
+  }
+  if (!sievePluginPath) {
+    problems.push(
+      "kein Sieve-Skriptpfad konfiguriert (plugin { sieve = ~/.dovecot.sieve } fehlt in " +
+        "/etc/dovecot/conf.d/90-sieve.conf)"
+    );
+  }
+
+  if (problems.length === 0) return null;
+
+  return (
+    `Dovecot ist auf diesem Server nicht für Sieve eingerichtet: ${problems.join("; ")}. ` +
+    'Siehe docs/DEPLOYMENT.md, Abschnitt "Dovecot: Sieve (server-side forwarding + autoresponder)".'
+  );
+}
+
 const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const USERNAME_PATTERN = /^[a-z_][a-z0-9_-]{0,31}$/;
 
@@ -204,6 +265,16 @@ export function syncMailRouting(username: string, settings: MailRoutingSettings)
     fs.chownSync(filePath, stats.uid, stats.gid);
   } catch (err) {
     console.error(`Could not chown ${filePath} to match its home directory:`, err);
+  }
+
+  // Checked in this order on purpose: a missing Dovecot config is the
+  // more fundamental problem (nothing about the script's own content can
+  // fix it), and there's no reason to bother the user with a compile
+  // error for a script Dovecot isn't even going to load in the first
+  // place.
+  const configProblem = checkDovecotSieveConfigured();
+  if (configProblem) {
+    throw new Error(`Gespeichert, aber noch nicht aktiv: ${configProblem}`);
   }
 
   const sieveError = checkSieveScript(filePath);
