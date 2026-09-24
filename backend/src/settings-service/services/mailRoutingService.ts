@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { execFileSync } from "child_process";
 import { env } from "../../config/env.js";
 
 /**
@@ -24,6 +25,47 @@ import { env } from "../../config/env.js";
  */
 
 const SIEVE_FILENAME = ".dovecot.sieve";
+
+// Pigeonhole's Sieve compiler (the `dovecot-sieve` package's `sievec`)
+// installs to different locations across distros - a plain $PATH lookup
+// covers most, the Debian/Ubuntu package also drops a copy under
+// /usr/lib/dovecot for systems that don't put it on PATH.
+const SIEVEC_CANDIDATES = ["sievec", "/usr/bin/sievec", "/usr/lib/dovecot/sievec"];
+
+/**
+ * Syntax-checks a freshly written Sieve script with Pigeonhole's own
+ * compiler, if it's installed. A script that fails to compile still gets
+ * *written* (so the forwarding/vacation settings behind it aren't lost),
+ * but Dovecot's LMTP delivery treats a broken script as if it didn't
+ * exist and silently falls back to plain delivery - i.e. forwarding and
+ * the autoresponder do nothing, with no error visible anywhere in Mailux.
+ * Catching that here, right after writing the script, is the difference
+ * between "why isn't this working" being answerable from the settings
+ * page or only from Dovecot's own logs on the server.
+ *
+ * Returns an error message describing the problem, or null when the
+ * script compiles cleanly (or no sievec binary could be found to check
+ * with - in which case we quietly skip the check rather than treating a
+ * missing compiler as a Sieve error).
+ */
+function checkSieveScript(filePath: string): string | null {
+  for (const bin of SIEVEC_CANDIDATES) {
+    try {
+      execFileSync(bin, [filePath], { stdio: "pipe" });
+      // Compiling also writes a .svbin cache next to the script - the same
+      // file Dovecot itself would produce on first delivery, just created
+      // a little earlier.
+      return null;
+    } catch (err: any) {
+      if (err?.code === "ENOENT") continue; // not installed here - try the next candidate
+
+      const stderr = err?.stderr ? err.stderr.toString().trim() : "";
+      return stderr || err?.message || "Das Sieve-Skript konnte nicht kompiliert werden.";
+    }
+  }
+
+  return null;
+}
 
 const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const USERNAME_PATTERN = /^[a-z_][a-z0-9_-]{0,31}$/;
@@ -162,5 +204,13 @@ export function syncMailRouting(username: string, settings: MailRoutingSettings)
     fs.chownSync(filePath, stats.uid, stats.gid);
   } catch (err) {
     console.error(`Could not chown ${filePath} to match its home directory:`, err);
+  }
+
+  const sieveError = checkSieveScript(filePath);
+  if (sieveError) {
+    throw new Error(
+      `Gespeichert, aber das Sieve-Skript ist fehlerhaft und wird von Dovecot ignoriert - ` +
+        `Weiterleitung/Autoresponder sind dadurch inaktiv: ${sieveError}`
+    );
   }
 }

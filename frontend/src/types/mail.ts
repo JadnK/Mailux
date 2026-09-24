@@ -90,6 +90,10 @@ export type UserSettings = {
   vacationEnd?: string | null;
   forwardingAddress: string | null;
   templates: MailTemplate[];
+  /** Only present right after saving forwarding/autoresponder settings,
+   *  when the generated Sieve script failed Dovecot's own syntax check -
+   *  the settings themselves still saved, but aren't live yet. */
+  sieveWarning?: string;
 };
 
 export type GlobalSettings = {

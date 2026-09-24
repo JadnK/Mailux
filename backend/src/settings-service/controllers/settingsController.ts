@@ -98,6 +98,7 @@ export const modifyMySettings = (req: AuthRequest, res: Response) => {
 
     const updated = updateUserSettings(username(req), updates);
 
+    let sieveWarning: string | undefined;
     try {
       syncMailRouting(username(req), {
         forwardingAddress: updated.forwardingAddress,
@@ -109,12 +110,16 @@ export const modifyMySettings = (req: AuthRequest, res: Response) => {
       });
     } catch (err) {
       // Settings were already saved above - a Sieve sync failure (e.g. an
-      // unwritable home directory) shouldn't roll that back, but it does
-      // mean forwarding/autoresponder won't actually be live yet.
+      // unwritable home directory, or a script that fails to compile)
+      // shouldn't roll that back, but it does mean forwarding/autoresponder
+      // won't actually be live yet - say so in the response instead of
+      // only logging it server-side, or "the autoresponder doesn't work"
+      // becomes undiagnosable from the UI.
       console.error("syncMailRouting error:", err);
+      sieveWarning = err instanceof Error ? err.message : "Weiterleitung/Autoresponder konnte nicht aktiviert werden.";
     }
 
-    res.json(updated);
+    res.json(sieveWarning ? { ...updated, sieveWarning } : updated);
   } catch (err) {
     console.error("modifyMySettings error:", err);
     res.status(500).json({ message: "Error updating settings" });
