@@ -32,7 +32,6 @@ export function LoginPanel({ onLogin, sessionExpired }: LoginPanelProps) {
 
   return (
     <main className="login-screen">
-      <div className="login-glow" aria-hidden="true" />
       <section className="login-card">
         <div className="brand-mark">M</div>
         <h1>Mailux</h1>

@@ -683,7 +683,6 @@ export function MailShell({ session, onLogout }: MailShellProps) {
     // the login screen it most resembles.
     return (
       <div className="login-screen">
-        <div className="login-glow" />
         <div className="login-card no-access-state">
           <h1>Kein Zugriff eingerichtet</h1>
           <p>
