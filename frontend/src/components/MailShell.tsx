@@ -127,8 +127,49 @@ function plainPreview(mail?: Mail): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+/** Protocols a link inside a received mail may open (always in a new tab). */
+const SAFE_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
+
+/**
+ * Makes every link in the mail iframe open in a new tab instead of
+ * navigating the iframe itself (which would replace the mail with the
+ * linked page). In-mail anchors (`#section`) just scroll; anything that
+ * isn't http(s)/mailto/tel (e.g. `javascript:`) is swallowed.
+ */
+function handleMailLinkClick(event: MouseEvent) {
+  const target = event.target as Element | null;
+  const anchor = target?.closest?.("a[href], area[href]") as HTMLAnchorElement | null;
+  if (!anchor) return;
+
+  const rawHref = anchor.getAttribute("href")?.trim() ?? "";
+  event.preventDefault();
+
+  if (rawHref.startsWith("#")) {
+    const id = decodeURIComponent(rawHref.slice(1));
+    if (!id) return;
+    const doc = anchor.ownerDocument;
+    const dest = doc.getElementById(id) ?? doc.getElementsByName(id)[0];
+    dest?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(anchor.href);
+  } catch {
+    return;
+  }
+  if (!SAFE_LINK_PROTOCOLS.has(url.protocol)) return;
+
+  window.open(url.toString(), "_blank", "noopener,noreferrer");
+}
+
 function wrapMailHtml(html: string): string {
-  const baseStyle = `<style>
+  // <base target> as a fallback so anything we don't intercept (form
+  // submits) also opens outside the iframe, and no-referrer so opening a
+  // link doesn't leak the webmail URL.
+  const baseTags = `<base target="_blank"><meta name="referrer" content="no-referrer">`;
+  const baseStyle = `${baseTags}<style>
     html, body { margin: 0; }
     body {
       padding: 24px;
@@ -173,9 +214,13 @@ const EMPTY_COMPOSE: ComposePayload = {
  * `allow-same-origin` (with no `allow-scripts`, `allow-forms`, etc.) is
  * what makes measuring the content possible at all: without it the iframe
  * gets an opaque cross-origin document and `contentDocument` throws. The
- * mail HTML still can't execute any script or navigate anywhere - it's
- * just no longer treated as cross-origin for the purpose of reading its
- * rendered height.
+ * mail HTML still can't execute any script - it's just no longer treated
+ * as cross-origin for the purpose of reading its rendered height.
+ *
+ * Links: clicks are intercepted (handleMailLinkClick) and opened in a new
+ * tab, so the iframe itself never navigates away from the mail.
+ * `allow-popups(-to-escape-sandbox)` lets those tabs (and form submits,
+ * via `allow-forms` + `<base target="_blank">`) behave like normal pages.
  */
 function MailIframe({ html }: { html: string }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -214,6 +259,8 @@ function MailIframe({ html }: { html: string }) {
         const doc = frame?.contentDocument;
         if (!doc) return;
 
+        doc.addEventListener("click", handleMailLinkClick);
+
         // Images (and webfonts) can keep loading after the iframe's own
         // load event fires, silently growing the content after we already
         // measured it once - catch those too.
@@ -242,7 +289,7 @@ function MailIframe({ html }: { html: string }) {
     <iframe
       ref={iframeRef}
       title="Nachricht"
-      sandbox="allow-same-origin"
+      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
       srcDoc={wrapMailHtml(html)}
     />
   );
